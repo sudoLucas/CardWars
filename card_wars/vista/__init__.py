@@ -1,0 +1,1 @@
+# vista/__init__.py
