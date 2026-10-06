@@ -151,14 +151,16 @@ DUELO_DURACION = 1500   # ms que se ve el resultado antes de pasar de ronda
 
 # Pool de cartas: (nombre, poder)
 POOL_CARTAS = [
-    ("Gato",   5),
-    ("Slime",  5),
-    ("Perro", 10),
-    ("Lobo",  10),
+    ("Gato",    5),
+    ("Slime",   5),
+    ("Perro",  10),
+    ("Lobo",   10),
     ("Dragon", 15),
-    ("Fenix", 20),
-    ("Titan", 20),
-    ("Golem", 25),
+    ("Tigre",  15),   # <-- NUEVA de 15
+    ("Fenix",  20),
+    ("Titan",  20),
+    ("Golem",  25),
+    ("Vampiro", 25),  # <-- NUEVA de 25
 ]
 
 
