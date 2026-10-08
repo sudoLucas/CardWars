@@ -1,7 +1,7 @@
 # vista/render.py
 import math
 import pygame
-from config import ANCHO, Layout, Turno
+from config import ANCHO, ALTO, Layout, Turno
 from vista.colores import (
     NEGRO, BLANCO, AMARILLO, VERDE, ROJO, GRIS_OSCURO,
     COLOR_JUGADOR, COLOR_JUGADOR_HOVER, COLOR_ENEMIGO,
@@ -13,38 +13,57 @@ from vista.colores import (
 )
 
 
-# ---------- Parametros de la ola ----------
+# Escala de pixelado (debe coincidir con main.py)
+ESCALA_PIXEL = 4
+
+
 OLA_AMPLITUD   = 4.0
 OLA_FRECUENCIA = 0.015
 OLA_VELOCIDAD  = 0.005
 
-# ---------- Parametros del abanico ----------
 ABANICO_ANGULO    = 5
 ABANICO_SEP_X     = 100
 ABANICO_OFFSET_Y  = 18
 
 
 class Render:
-    def __init__(self, pantalla, fuentes):
-        self.pantalla = pantalla
+    def __init__(self, surface_mundo, surface_ui, fuentes):
+        self.mundo = surface_mundo
+        self.ui = surface_ui
         self.f = fuentes
         self.tiempo = 0.0
+        self.escala = ESCALA_PIXEL
 
     def tick(self, dt):
         self.tiempo += dt
 
     # ---------- Helpers ----------
-    def _texto_centrado(self, txt, fuente, color, cx, y):
+    def _texto_centrado_ui(self, txt, fuente, color, cx, y):
+        """Dibuja texto centrado en la surface UI (coordenadas de pantalla completa)."""
         surf = fuente.render(txt, True, color)
-        self.pantalla.blit(surf, (cx - surf.get_width() // 2, y))
+        self.ui.blit(surf, (cx - surf.get_width() // 2, y))
         return surf.get_rect(topleft=(cx - surf.get_width() // 2, y))
+
+    def _texto_ui(self, txt, fuente, color, x, y):
+        """Dibuja texto en la surface UI (coordenadas de pantalla completa)."""
+        surf = fuente.render(txt, True, color)
+        self.ui.blit(surf, (x, y))
+        return surf.get_rect(topleft=(x, y))
 
     def _offset_ola(self, x):
         return math.sin(x * OLA_FRECUENCIA + self.tiempo * OLA_VELOCIDAD) * OLA_AMPLITUD
 
-    # ---------- Superficie de una carta (para poder rotarla) ----------
+    def _dibujar_rect_mundo(self, color, rect, radio=0):
+        """Dibuja un rect en la surface del MUNDO con coordenadas divididas por escala."""
+        e = self.escala
+        r = pygame.Rect(rect[0] // e, rect[1] // e, rect[2] // e, rect[3] // e)
+        pygame.draw.rect(self.mundo, color, r, border_radius=radio // e if radio else 0)
+
+    # ---------- Superficie de una carta ----------
     def _superficie_carta(self, carta, color_fondo):
-        w, h = Layout.CARTA_W, Layout.CARTA_H
+        """Devuelve una surface de carta del tamano del MUNDO (dividido por escala)."""
+        e = self.escala
+        w, h = Layout.CARTA_W // e, Layout.CARTA_H // e
         surf = pygame.Surface((w, h), pygame.SRCALPHA)
 
         if not carta.viva:
@@ -52,72 +71,47 @@ class Render:
         else:
             color = color_fondo
 
-        pygame.draw.rect(surf, color, (0, 0, w, h), border_radius=10)
-        pygame.draw.rect(surf, BLANCO, (0, 0, w, h), 2, border_radius=10)
-
-        nombre = self.f["chica"].render(carta.nombre, True, BLANCO)
-        surf.blit(nombre, (8, 6))
-
-        if carta.viva:
-            poder_txt = self.f["grande"].render(str(carta.poder), True, AMARILLO)
-        else:
-            poder_txt = self.f["grande"].render("0", True, (120, 40, 40))
-        surf.blit(poder_txt, (w // 2 - poder_txt.get_width() // 2, 40))
-
-        lbl = self.f["chica"].render("zz PODER", True, BLANCO)
-        surf.blit(lbl, (w // 2 - lbl.get_width() // 2, 80))
-
-        if carta.viva:
-            lbl_a = self.f["chica"].render("zz AGUANTE", True, COLOR_AGUANTE)
-            surf.blit(lbl_a, (w // 2 - lbl_a.get_width() // 2, 105))
-
-            max_ag = carta.poder
-            ancho_max = w - 24
-            ancho_actual = int(ancho_max * carta.aguante / max_ag) if max_ag > 0 else 0
-            pygame.draw.rect(surf, COLOR_FONDO_BARRA, (12, 125, ancho_max, 10), border_radius=3)
-            pygame.draw.rect(surf, COLOR_AGUANTE, (12, 125, ancho_actual, 10), border_radius=3)
-
-            num_ag = self.f["chica"].render(f"{carta.aguante}/{max_ag}", True, BLANCO)
-            surf.blit(num_ag, (w // 2 - num_ag.get_width() // 2, 140))
-        else:
-            equis = self.f["icono"].render("X", True, (200, 60, 60))
-            surf.blit(equis, (w // 2 - equis.get_width() // 2, 115))
+        pygame.draw.rect(surf, color, (0, 0, w, h), border_radius=5)
+        pygame.draw.rect(surf, BLANCO, (0, 0, w, h), 1, border_radius=5)
 
         return surf
 
     def _superficie_dorso(self):
-        w, h = Layout.CARTA_W, Layout.CARTA_H
+        e = self.escala
+        w, h = Layout.CARTA_W // e, Layout.CARTA_H // e
         surf = pygame.Surface((w, h), pygame.SRCALPHA)
 
-        pygame.draw.rect(surf, COLOR_DORSO, (0, 0, w, h), border_radius=10)
-        pygame.draw.rect(surf, BLANCO, (0, 0, w, h), 2, border_radius=10)
+        pygame.draw.rect(surf, COLOR_DORSO, (0, 0, w, h), border_radius=5)
+        pygame.draw.rect(surf, BLANCO, (0, 0, w, h), 1, border_radius=5)
 
         cx = w // 2
         cy = h // 2
         pulso = 1.0 + 0.08 * math.sin(self.tiempo * 0.004)
-        tam = int(30 * pulso)
+        tam = int(15 * pulso)
 
-        # Rombo bordo mas oscuro, para que contraste con el COLOR_DORSO
         pygame.draw.polygon(surf, (60, 15, 25), [
-            (cx, cy - tam),
-            (cx + tam, cy),
-            (cx, cy + tam),
-            (cx - tam, cy),
+            (cx, cy - tam), (cx + tam, cy), (cx, cy + tam), (cx - tam, cy),
         ])
         pygame.draw.polygon(surf, BLANCO, [
-            (cx, cy - tam),
-            (cx + tam, cy),
-            (cx, cy + tam),
-            (cx - tam, cy),
-        ], 2)
+            (cx, cy - tam), (cx + tam, cy), (cx, cy + tam), (cx - tam, cy),
+        ], 1)
 
         return surf
 
-    # ---------- Carta grande (dibujo directo, sin rotar) ----------
+    # ---------- Carta grande ----------
     def dibujar_carta(self, x, y, carta, color_fondo, hover=False, resaltada=False, ola=False):
-        w, h = Layout.CARTA_W, Layout.CARTA_H
+        """
+        Dibuja una carta. Los ELEMENTOS van al mundo.
+        El texto (nombre, poder, aguante) va a la UI con coordenadas * escala.
+        """
+        e = self.escala
+        w_m, h_m = Layout.CARTA_W // e, Layout.CARTA_H // e
+
         if ola:
             y = y + self._offset_ola(x)
+
+        # Posicion en el mundo
+        xm, ym = x // e, y // e
 
         if not carta.viva:
             color = COLOR_MUERTA
@@ -128,122 +122,156 @@ class Render:
         else:
             color = color_fondo
 
-        pygame.draw.rect(self.pantalla, color, (x, y, w, h), border_radius=10)
+        # Rect de fondo (mundo)
+        rect_m = pygame.Rect(xm, ym, w_m, h_m)
+        pygame.draw.rect(self.mundo, color, rect_m, border_radius=5)
         borde = AMARILLO if resaltada else BLANCO
-        pygame.draw.rect(self.pantalla, borde, (x, y, w, h), 2, border_radius=10)
+        pygame.draw.rect(self.mundo, borde, rect_m, 1, border_radius=5)
 
-        nombre = self.f["chica"].render(carta.nombre, True, BLANCO)
-        self.pantalla.blit(nombre, (x + 8, y + 6))
-
+        # Barra de aguante (mundo)
         if carta.viva:
-            poder_txt = self.f["grande"].render(str(carta.poder), True, AMARILLO)
-        else:
-            poder_txt = self.f["grande"].render("0", True, (120, 40, 40))
-        self.pantalla.blit(poder_txt, (x + w // 2 - poder_txt.get_width() // 2, y + 40))
-
-        self._texto_centrado("zz PODER", self.f["chica"], BLANCO, x + w // 2, y + 80)
-
-        if carta.viva:
-            self._texto_centrado("zz AGUANTE", self.f["chica"], COLOR_AGUANTE, x + w // 2, y + 105)
             max_ag = carta.poder
-            ancho_max = w - 24
-            ancho_actual = int(ancho_max * carta.aguante / max_ag) if max_ag > 0 else 0
-            pygame.draw.rect(self.pantalla, COLOR_FONDO_BARRA,
-                             (x + 12, y + 125, ancho_max, 10), border_radius=3)
-            pygame.draw.rect(self.pantalla, COLOR_AGUANTE,
-                             (x + 12, y + 125, ancho_actual, 10), border_radius=3)
-            self._texto_centrado(f"{carta.aguante}/{max_ag}",
-                                 self.f["chica"], BLANCO, x + w // 2, y + 140)
+            ancho_max_m = w_m - 12
+            ancho_actual_m = int(ancho_max_m * carta.aguante / max_ag) if max_ag > 0 else 0
+            barra_y = ym + h_m - 18
+            pygame.draw.rect(self.mundo, COLOR_FONDO_BARRA,
+                             (xm + 6, barra_y, ancho_max_m, 5), border_radius=2)
+            pygame.draw.rect(self.mundo, COLOR_AGUANTE,
+                             (xm + 6, barra_y, ancho_actual_m, 5), border_radius=2)
         else:
-            equis = self.f["icono"].render("X", True, (200, 60, 60))
-            self.pantalla.blit(equis, (x + w // 2 - equis.get_width() // 2, y + 115))
+            # Cruz dibujada en el mundo
+            cx_m = xm + w_m // 2
+            cy_m = ym + h_m // 2 + 5
+            pygame.draw.line(self.mundo, (200, 60, 60),
+                             (cx_m - 8, cy_m - 8), (cx_m + 8, cy_m + 8), 3)
+            pygame.draw.line(self.mundo, (200, 60, 60),
+                             (cx_m + 8, cy_m - 8), (cx_m - 8, cy_m + 8), 3)
 
-        return pygame.Rect(x, y, w, h)
+        # --- Textos a la UI con coordenadas * escala ---
+        # Nombre (esquina sup izq)
+        self._texto_ui(carta.nombre, self.f["chica"], BLANCO, x + 8, y + 6)
+
+        # Poder (centro arriba)
+        poder_txt = str(carta.poder) if carta.viva else "0"
+        poder_color = AMARILLO if carta.viva else (120, 40, 40)
+        self._texto_centrado_ui(poder_txt, self.f["grande"], poder_color,
+                                 x + Layout.CARTA_W // 2, y + 40)
+
+        # Etiqueta PODER
+        self._texto_centrado_ui("PODER", self.f["chica"], BLANCO,
+                                 x + Layout.CARTA_W // 2, y + 80)
+
+        if carta.viva:
+            self._texto_centrado_ui("AGUANTE", self.f["chica"], COLOR_AGUANTE,
+                                     x + Layout.CARTA_W // 2, y + 105)
+            max_ag = carta.poder
+            self._texto_centrado_ui(f"{carta.aguante}/{max_ag}",
+                                     self.f["chica"], BLANCO,
+                                     x + Layout.CARTA_W // 2, y + 140)
+
+        return pygame.Rect(x, y, Layout.CARTA_W, Layout.CARTA_H)
 
     # ---------- Carta rotada ----------
     def dibujar_carta_rotada(self, cx, cy, surf, angulo, ola=False):
         if ola:
-            cy += self._offset_ola(cx)
+            cy += self._offset_ola(cx) * self.escala
 
         rotada = pygame.transform.rotate(surf, angulo)
-        rect = rotada.get_rect(center=(cx, cy))
-        self.pantalla.blit(rotada, rect)
+        e = self.escala
+        rect = rotada.get_rect(center=(cx // e, cy // e))
+        self.mundo.blit(rotada, rect)
 
     # ---------- Barra de HP ----------
     def dibujar_hp(self, x, y, hp, hp_max, etiqueta, color):
+        e = self.escala
         w, h = Layout.HP_BAR_W, Layout.HP_BAR_H
-        pygame.draw.rect(self.pantalla, COLOR_FONDO_BARRA, (x, y, w, h), border_radius=6)
-        ancho = max(0, int(w * hp / hp_max))
-        pygame.draw.rect(self.pantalla, color, (x, y, ancho, h), border_radius=6)
-        txt = self.f["normal"].render(f"{etiqueta}: {max(0,hp)} HP", True, BLANCO)
-        self.pantalla.blit(txt, (x + w // 2 - txt.get_width() // 2, y + 6))
+
+        # Barra en el mundo
+        xm, ym = x // e, y // e
+        wm, hm = w // e, h // e
+        pygame.draw.rect(self.mundo, COLOR_FONDO_BARRA, (xm, ym, wm, hm), border_radius=3)
+        ancho = max(0, int(wm * hp / hp_max))
+        pygame.draw.rect(self.mundo, color, (xm, ym, ancho, hm), border_radius=3)
+
+        # Texto en la UI
+        txt = f"{etiqueta}: {max(0, hp)} HP"
+        self._texto_centrado_ui(txt, self.f["normal"], BLANCO,
+                                 x + w // 2, y + 6)
 
     # ---------- Mini carta ----------
     def dibujar_mini(self, x, y, carta, color_fondo, activa=False):
+        e = self.escala
         w, h = Layout.MINI_W, Layout.MINI_H
+
+        # Fondo en el mundo
+        xm, ym = x // e, y // e
+        wm, hm = w // e, h // e
+
         if not carta.viva:
             color = COLOR_MUERTA
         elif activa:
             color = COLOR_ENEMIGO_ACTIVA
         else:
             color = color_fondo
-        pygame.draw.rect(self.pantalla, color, (x, y, w, h), border_radius=8)
-        pygame.draw.rect(self.pantalla, BLANCO, (x, y, w, h), 2, border_radius=8)
 
-        nombre = self.f["mini"].render(carta.nombre, True, BLANCO)
-        self.pantalla.blit(nombre, (x + 8, y + 5))
+        pygame.draw.rect(self.mundo, color, (xm, ym, wm, hm), border_radius=4)
+        pygame.draw.rect(self.mundo, BLANCO, (xm, ym, wm, hm), 1, border_radius=4)
+
+        # Textos en la UI
+        self._texto_ui(carta.nombre, self.f["mini"], BLANCO, x + 8, y + 5)
 
         if carta.viva:
-            txt = self.f["mini"].render(f"zz P {carta.poder}", True, AMARILLO)
-            self.pantalla.blit(txt, (x + 8, y + 27))
-            txt2 = self.f["chica"].render(f"zz AGU {carta.aguante}", True, COLOR_AGUANTE)
-            self.pantalla.blit(txt2, (x + 8, y + 52))
+            self._texto_ui(f"P {carta.poder}", self.f["mini"], AMARILLO, x + 8, y + 27)
+            self._texto_ui(f"AGU {carta.aguante}", self.f["chica"], COLOR_AGUANTE, x + 8, y + 52)
         else:
-            txt = self.f["normal"].render("zz MUERTA", True, (200, 60, 60))
-            self.pantalla.blit(txt, (x + 15, y + 28))
+            self._texto_ui("MUERTA", self.f["normal"], (200, 60, 60), x + 15, y + 28)
 
     # ---------- Boton ----------
     def dibujar_boton(self, rect, texto, hover, color_on, color_off):
+        e = self.escala
         color = color_on if hover else color_off
-        pygame.draw.rect(self.pantalla, color, rect, border_radius=6)
-        pygame.draw.rect(self.pantalla, BLANCO, rect, 2, border_radius=6)
+
+        # Fondo del boton en el mundo
+        rm = pygame.Rect(rect.x // e, rect.y // e, rect.w // e, rect.h // e)
+        pygame.draw.rect(self.mundo, color, rm, border_radius=3)
+        pygame.draw.rect(self.mundo, BLANCO, rm, 1, border_radius=3)
+
+        # Texto en la UI
         surf = self.f["chica"].render(texto, True, BLANCO)
-        self.pantalla.blit(surf, (rect.x + rect.w // 2 - surf.get_width() // 2,
-                                  rect.y + rect.h // 2 - surf.get_height() // 2))
+        self.ui.blit(surf, (rect.x + rect.w // 2 - surf.get_width() // 2,
+                             rect.y + rect.h // 2 - surf.get_height() // 2))
 
     # ---------- Escena completa ----------
     def dibujar_escena(self, juego, rects_jugador, rects_enemigo, mouse,
                        boton_reiniciar, boton_siguiente):
-        self.pantalla.fill(NEGRO)
+        self.mundo.fill(NEGRO)
 
         # HP
         self.dibujar_hp(Layout.HP_BAR_X_IZQ, Layout.HP_BAR_Y,
-                        juego.hp_jugador, juego.hp_jugador_max, "zz TU", VERDE)
+                        juego.hp_jugador, juego.hp_jugador_max, "TU", VERDE)
         self.dibujar_hp(Layout.HP_BAR_X_DER, Layout.HP_BAR_Y,
-                        juego.hp_enemigo, juego.hp_enemigo_max, "zz MAQUINA", ROJO)
+                        juego.hp_enemigo, juego.hp_enemigo_max, "MAQUINA", ROJO)
 
         # Ronda
-        self._texto_centrado(f"zz RONDA {juego.ronda}",
-                             self.f["ronda"], AMARILLO, ANCHO // 2, 12)
+        self._texto_centrado_ui(f"RONDA {juego.ronda}",
+                                 self.f["ronda"], AMARILLO, ANCHO // 2, 12)
 
-        # Rebarajes (solo del jugador)
+        # Rebarajes
         reb_j = juego.mazo_jugador.rebarajes
         if reb_j:
-            self._texto_centrado(
-                f"zz Rebarajes - Tu: {reb_j}",
-                self.f["chica"], COLOR_INFO, ANCHO // 2, 38)
+            self._texto_centrado_ui(f"Rebarajes - Tu: {reb_j}",
+                                     self.f["chica"], COLOR_INFO, ANCHO // 2, 38)
 
-        # Etiqueta
-        self._texto_centrado("zz CARTAS DEL RIVAL",
-                             self.f["chica"], COLOR_ETIQ_RIVAL,
-                             ANCHO // 2, Layout.Y_CARTAS_RIVAL - 15)
+        # Etiqueta rival
+        self._texto_centrado_ui("CARTAS DEL RIVAL",
+                                 self.f["chica"], COLOR_ETIQ_RIVAL,
+                                 ANCHO // 2, Layout.Y_CARTAS_RIVAL - 15)
 
-        # ---------- Cartas rival en ABANICO ROTADO (solo las vivas) ----------
-        cantidad = len(rects_enemigo)   # solo cartas vivas
+        # Cartas rival en abanico
+        cantidad = len(rects_enemigo)
         cx_centro = ANCHO // 2
         cy_centro = Layout.Y_CARTAS_RIVAL + Layout.CARTA_H // 2
 
-        # Todas las cartas del abanico son dorsos
         superficies = [self._superficie_dorso() for _ in range(cantidad)]
 
         if cantidad > 1:
@@ -252,7 +280,6 @@ class Render:
         else:
             angulos = [0]
 
-        # Orden: primero las puntas, ultima la del medio (queda encima)
         orden = sorted(range(cantidad),
                        key=lambda i: abs(i - (cantidad - 1) / 2.0),
                        reverse=True)
@@ -261,16 +288,15 @@ class Render:
             dist_al_centro = abs(i - (cantidad - 1) / 2.0)
             dx = (i - (cantidad - 1) / 2.0) * ABANICO_SEP_X
             dy = dist_al_centro * ABANICO_OFFSET_Y
-
             cx = cx_centro + int(dx)
             cy = cy_centro + int(dy)
-
             self.dibujar_carta_rotada(cx, cy, superficies[i], angulos[i], ola=True)
 
-        # Linea zona duelo
-        pygame.draw.line(self.pantalla, COLOR_LINEA_DUELO,
-                         (40, Layout.Y_ZONA_DUELO - 5),
-                         (ANCHO - 40, Layout.Y_ZONA_DUELO - 5), 1)
+        # Linea zona duelo (mundo)
+        e = self.escala
+        pygame.draw.line(self.mundo, COLOR_LINEA_DUELO,
+                         (40 // e, (Layout.Y_ZONA_DUELO - 5) // e),
+                         ((ANCHO - 40) // e, (Layout.Y_ZONA_DUELO - 5) // e), 1)
 
         # Mini cartas
         if juego.carta_jugada_jugador is not None:
@@ -280,8 +306,8 @@ class Render:
                 Layout.Y_ZONA_DUELO + Layout.MINI_Y_OFFSET,
                 cj, COLOR_JUGADOR)
 
-        self._texto_centrado("zz VS", self.f["grande"], AMARILLO,
-                             ANCHO // 2, Layout.Y_ZONA_DUELO + 30)
+        self._texto_centrado_ui("VS", self.f["grande"], AMARILLO,
+                                 ANCHO // 2, Layout.Y_ZONA_DUELO + 30)
 
         if juego.carta_jugada_enemigo is not None:
             ce = juego.mazo_enemigo[juego.carta_jugada_enemigo]
@@ -291,30 +317,27 @@ class Render:
                 ce, COLOR_ENEMIGO, activa=True)
 
         # Mensaje
-        self._texto_centrado(juego.mensaje, self.f["mensaje"], AMARILLO,
-                             ANCHO // 2, Layout.Y_MENSAJE)
+        self._texto_centrado_ui(juego.mensaje, self.f["mensaje"], AMARILLO,
+                                 ANCHO // 2, Layout.Y_MENSAJE)
 
         # Etiqueta tus cartas
-        self._texto_centrado("zz TUS CARTAS (click para tirar a la mesa)",
-                             self.f["chica"], COLOR_ETIQ_JUGADOR,
-                             ANCHO // 2, Layout.Y_CARTAS_TU - 15)
+        self._texto_centrado_ui("TUS CARTAS (click para tirar a la mesa)",
+                                 self.f["chica"], COLOR_ETIQ_JUGADOR,
+                                 ANCHO // 2, Layout.Y_CARTAS_TU - 15)
 
-        # Cartas jugador (solo vivas, ya filtradas en rects_jugador)
+        # Cartas jugador
         for idx, rect in rects_jugador:
             carta = juego.mazo_jugador[idx]
             seleccionable = (juego.turno == Turno.JUGADOR and carta.viva)
             hover = seleccionable and rect.collidepoint(mouse)
             self.dibujar_carta(rect.x, rect.y, carta, COLOR_JUGADOR, hover=hover, ola=True)
 
-        # Boton SIGUIENTE RONDA
+        # Botones
         if juego.turno == Turno.RESOLVIENDO:
-            self.dibujar_boton(boton_siguiente, "zz SIGUIENTE RONDA (ESPACIO)",
+            self.dibujar_boton(boton_siguiente, "SIGUIENTE RONDA (ESPACIO)",
                                boton_siguiente.collidepoint(mouse),
                                COLOR_BTN_VERDE, COLOR_BTN_VERDE_OFF)
 
-        # Boton REINICIAR
-        self.dibujar_boton(boton_reiniciar, "zz REINICIAR (R)",
+        self.dibujar_boton(boton_reiniciar, "REINICIAR (R)",
                            boton_reiniciar.collidepoint(mouse),
                            COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF)
-
-        pygame.display.flip()

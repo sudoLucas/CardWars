@@ -19,21 +19,18 @@ class EscenaDificultad(Escena):
         h = Botones.MENU_H
         sep = 70
 
-        # Un boton por dificultad
         self.botones = []
         claves = ["facil", "normal", "duro"]
         for i, clave in enumerate(claves):
             cfg = DIFICULTADES[clave]
-            texto = f"zz {cfg.nombre}"
+            texto = cfg.nombre
             rect = pygame.Rect(cx - w // 2, y + i * sep, w, h)
             self.botones.append((clave, texto, rect))
 
-        # Boton volver
         self.boton_volver = pygame.Rect(cx - w // 2, y + 3 * sep + 20, w, h)
 
         self.hover = None
 
-    # ---------- Eventos ----------
     def handle_event(self, evento):
         mouse = pygame.mouse.get_pos()
 
@@ -53,7 +50,6 @@ class EscenaDificultad(Escena):
             for clave, _, rect in self.botones:
                 if rect.collidepoint(mouse):
                     self.app.clave_dificultad = clave
-                    # Volver al menu automaticamente
                     from escenas.menu import EscenaMenu
                     self.app.cambiar_escena(EscenaMenu(self.app))
                     return
@@ -61,20 +57,17 @@ class EscenaDificultad(Escena):
                 from escenas.menu import EscenaMenu
                 self.app.cambiar_escena(EscenaMenu(self.app))
 
-    # ---------- Dibujo ----------
     def draw(self):
         self.pantalla.fill(NEGRO)
 
-        self.render._texto_centrado("zz DIFICULTAD", self.fuentes["grande"], AMARILLO,
-                                    ANCHO // 2, 90)
-        self.render._texto_centrado("zz Eleji el nivel de desafio",
-                                    self.fuentes["normal"], BLANCO,
-                                    ANCHO // 2, 150)
+        self.render._texto_centrado_ui("DIFICULTAD", self.fuentes["grande"], AMARILLO,
+                                        ANCHO // 2, 90)
+        self.render._texto_centrado_ui("Elegi el nivel de desafio",
+                                        self.fuentes["normal"], BLANCO,
+                                        ANCHO // 2, 150)
 
-        # Botones de dificultad
         for clave, texto, rect in self.botones:
             hover = (self.hover == clave)
-            # La actual se ve distinta
             actual = (clave == self.app.clave_dificultad)
 
             color_on = COLOR_BTN_VERDE if actual else COLOR_BTN_AZUL
@@ -82,14 +75,12 @@ class EscenaDificultad(Escena):
 
             self.render.dibujar_boton(rect, texto, hover, color_on, color_off)
 
-            # Descripcion debajo
             cfg = DIFICULTADES[clave]
             desc_y = rect.y + rect.h + 4
-            self.render._texto_centrado(cfg.descripcion,
-                                        self.fuentes["chica"], GRIS,
-                                        ANCHO // 2, desc_y)
+            self.render._texto_centrado_ui(cfg.descripcion,
+                                            self.fuentes["chica"], GRIS,
+                                            ANCHO // 2, desc_y)
 
-        # Boton volver
-        self.render.dibujar_boton(self.boton_volver, "zz VOLVER",
+        self.render.dibujar_boton(self.boton_volver, "VOLVER",
                                   self.hover == "volver",
                                   COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF)

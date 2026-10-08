@@ -1,35 +1,37 @@
 # vista/colores.py
-# Paleta de colores centralizada
+# Paleta de colores centralizada - ESTILO GAME BOY ADVANCE (GBA)
+# Nota: Colores de alta saturación y contraste para emular la pantalla LCD clásica.
 
-NEGRO       = (20, 20, 30)
-BLANCO      = (240, 240, 240)
-AMARILLO    = (240, 210, 90)
-VERDE       = (90, 200, 120)
-ROJO        = (200, 70, 70)
-AZUL_HP     = (100, 160, 220)
+# Colores Base GBA (Saturados)
+NEGRO       = (16, 16, 24)       # Casi negro, típico de contornos GBA
+BLANCO      = (248, 248, 240)    # Blanco LCD ligeramente cálido
+AMARILLO    = (248, 216, 0)      # Amarillo interfaz ("Pokemon/Zelda")
+VERDE       = (0, 200, 80)       # Verde brillante de menú
+ROJO        = (248, 48, 48)      # Rojo GBA muy vivo
+AZUL_HP     = (0, 144, 248)      # Azul puro de barra de energía
 
-# Grises
-GRIS        = (140, 140, 140)
-GRIS_OSCURO = (80, 80, 80)
+# Grises (Tonos lavados estilo LCD)
+GRIS        = (160, 168, 160)
+GRIS_OSCURO = (88, 96, 96)
 
-# Cartas
-COLOR_JUGADOR        = (90, 110, 160)
-COLOR_JUGADOR_HOVER  = (130, 170, 230)
-COLOR_ENEMIGO        = (150, 60, 60)
-COLOR_ENEMIGO_ACTIVA = (240, 160, 60)
-COLOR_MUERTA         = (40, 40, 40)
-COLOR_AGUANTE        = (140, 200, 255)
-COLOR_DORSO          = (100, 25, 40)   
+# Cartas (Paleta estilo RPG de GBA: Golden Sun / Fire Emblem)
+COLOR_JUGADOR        = (72, 120, 248)    # Azul héroe
+COLOR_JUGADOR_HOVER  = (120, 176, 248)   # Azul héroe seleccionado
+COLOR_ENEMIGO        = (216, 40, 40)     # Rojo jefe / rival
+COLOR_ENEMIGO_ACTIVA = (248, 120, 48)    # Naranja de alerta
+COLOR_MUERTA         = (56, 56, 64)      # Gris de descarte
+COLOR_AGUANTE        = (40, 216, 168)    # Verde agua / Stamina
+COLOR_DORSO          = (168, 16, 48)     # Bordó clásico de reverso
 
 # Elementos de UI
-COLOR_FONDO_BARRA    = (30, 30, 40)
-COLOR_LINEA_DUELO    = (50, 50, 70)
-COLOR_INFO           = (160, 160, 200)
-COLOR_ETIQ_RIVAL     = (200, 120, 120)
-COLOR_ETIQ_JUGADOR   = (150, 180, 230)
+COLOR_FONDO_BARRA    = (40, 40, 48)      # Fondo oscuro de menú
+COLOR_LINEA_DUELO    = (120, 120, 144)   # Separador metálico
+COLOR_INFO           = (232, 232, 248)   # Texto de caja de diálogo
+COLOR_ETIQ_RIVAL     = (248, 104, 104)   # Fondo indicador enemigo
+COLOR_ETIQ_JUGADOR   = (104, 168, 248)   # Fondo indicador jugador
 
-# Botones
-COLOR_BTN_VERDE      = (100, 200, 130)
-COLOR_BTN_VERDE_OFF  = (60, 140, 90)
-COLOR_BTN_AZUL       = (100, 130, 200)
-COLOR_BTN_AZUL_OFF   = (70, 90, 150)
+# Botones (Estilo menú de opciones brillante)
+COLOR_BTN_VERDE      = (0, 216, 0)
+COLOR_BTN_VERDE_OFF  = (0, 120, 0)
+COLOR_BTN_AZUL       = (0, 168, 248)
+COLOR_BTN_AZUL_OFF   = (0, 88, 168)

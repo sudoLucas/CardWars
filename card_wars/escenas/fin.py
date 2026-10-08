@@ -22,8 +22,8 @@ class EscenaFin(Escena):
         sep = 70
 
         self.botones = [
-            ("revancha", "zz REVANCHA", pygame.Rect(cx - w // 2, y + 0 * sep, w, h)),
-            ("menu",     "zz MENU",     pygame.Rect(cx - w // 2, y + 1 * sep, w, h)),
+            ("revancha", "REVANCHA", pygame.Rect(cx - w // 2, y + 0 * sep, w, h)),
+            ("menu",     "MENU",     pygame.Rect(cx - w // 2, y + 1 * sep, w, h)),
         ]
         self.hover = None
 
@@ -54,28 +54,24 @@ class EscenaFin(Escena):
     def draw(self):
         self.pantalla.fill(NEGRO)
 
-        # Titulo grande
         color = VERDE if self.gano else ROJO
-        texto = "zz GANASTE" if self.gano else "zz PERDISTE"
-        self.render._texto_centrado(texto, self.fuentes["grande"], color,
-                                    ANCHO // 2, 120)
+        texto = "GANASTE" if self.gano else "PERDISTE"
+        self.render._texto_centrado_ui(texto, self.fuentes["grande"], color,
+                                        ANCHO // 2, 120)
 
-        # Stats
-        self.render._texto_centrado(
-            f"zz Rondas jugadas: {self.juego.ronda}",
+        self.render._texto_centrado_ui(
+            f"Rondas jugadas: {self.juego.ronda}",
             self.fuentes["normal"], BLANCO, ANCHO // 2, 200)
-        self.render._texto_centrado(
-            f"zz HP final - Tu: {max(0, self.juego.hp_jugador)} | "
+        self.render._texto_centrado_ui(
+            f"HP final - Tu: {max(0, self.juego.hp_jugador)} | "
             f"Maquina: {max(0, self.juego.hp_enemigo)}",
             self.fuentes["normal"], BLANCO, ANCHO // 2, 240)
 
-        # Botones
         for clave, texto_btn, rect in self.botones:
             hover = (self.hover == clave)
             self.render.dibujar_boton(rect, texto_btn, hover,
                                       COLOR_BTN_VERDE, COLOR_BTN_VERDE_OFF)
 
-        # Pie
-        self.render._texto_centrado("zz ESC para volver al menu",
-                                    self.fuentes["chica"], GRIS,
-                                    ANCHO // 2, ALTO - 30)
+        self.render._texto_centrado_ui("ESC para volver al menu",
+                                        self.fuentes["chica"], GRIS,
+                                        ANCHO // 2, ALTO - 30)
