@@ -1,5 +1,4 @@
 # escenas/juego.py
-import sys
 import pygame
 from config import (
     ANCHO, ALTO, Layout, Botones, Turno,

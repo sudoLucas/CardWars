@@ -1,7 +1,6 @@
-# vista/fuentes.py
+# card_wars/vista/fuentes.py
 import os
 import pygame
-
 from config import RUTA_FUENTE
 
 
@@ -12,21 +11,18 @@ def _cargar(ruta, tamano, fallback="Arial", bold=False):
             return pygame.font.Font(ruta, tamano)
         except Exception:
             pass
-    # Fallback
+    # Fallback: SysFont si el .ttf no está disponible
     return pygame.font.SysFont(fallback, tamano, bold=bold)
 
 
 def cargar_fuentes():
-    """
-    Carga todas las fuentes del juego.
-    Si existe assets/fuentes/2player.ttf, la usa para todo.
-    """
+    e = 4  # debe coincidir con ESCALA_PIXEL de render.py
     return {
-        "normal":  _cargar(RUTA_FUENTE, 16, bold=True),
-        "grande":  _cargar(RUTA_FUENTE, 30, bold=True),
-        "chica":   _cargar(RUTA_FUENTE, 13),
-        "mensaje": _cargar(RUTA_FUENTE, 17, bold=True),
-        "ronda":   _cargar(RUTA_FUENTE, 20, bold=True),
-        "mini":    _cargar(RUTA_FUENTE, 14, bold=True),
-        "icono":   _cargar(RUTA_FUENTE, 38, bold=True),
+        "mini":    _cargar(RUTA_FUENTE, 6  * e, bold=False),  # = 24
+        "chica":   _cargar(RUTA_FUENTE, 8  * e, bold=False),  # = 32
+        "normal":  _cargar(RUTA_FUENTE, 9  * e, bold=True),   # = 36
+        "mensaje": _cargar(RUTA_FUENTE, 10 * e, bold=True),   # = 40
+        "ronda":   _cargar(RUTA_FUENTE, 12 * e, bold=True),   # = 48
+        "grande":  _cargar(RUTA_FUENTE, 16 * e, bold=True),   # = 64
+        "icono":   _cargar(RUTA_FUENTE, 18 * e, bold=True),   # = 72
     }

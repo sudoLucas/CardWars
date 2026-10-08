@@ -22,7 +22,7 @@ ANCHO, ALTO = 820, 620
 FPS = 60
 
 # Ruta de la fuente pixel art (si no existe, hace fallback a Arial)
-RUTA_FUENTE = "assets/fuentes/2player.ttf"
+RUTA_FUENTE = "assets/fuentes/pixel.ttf"
 
 
 # ============================================================
