@@ -15,16 +15,23 @@ class EscenaMenu(Escena):
     def __init__(self, app):
         super().__init__(app)
 
-        cx = ANCHO // 2
-        y = Botones.MENU_Y_INICIAL
+        # Coordenadas del MUNDO (300x200)
+        ancho_m = ANCHO // 4
+        cx_m = ancho_m // 2
+
         w = Botones.MENU_W
         h = Botones.MENU_H
         sep = Botones.MENU_ESPACIO_Y
+        y0 = Botones.MENU_Y_INICIAL
 
+        # Los botones se guardan en PANTALLA REAL (x4) para los clicks
         self.botones = [
-            ("jugar",      "JUGAR",       pygame.Rect(cx - w // 2, y + 0 * sep, w, h)),
-            ("dificultad", "DIFICULTAD",  pygame.Rect(cx - w // 2, y + 1 * sep, w, h)),
-            ("salir",      "SALIR",       pygame.Rect(cx - w // 2, y + 2 * sep, w, h)),
+            ("jugar",      "JUGAR",
+             pygame.Rect((cx_m - w // 2) * 4, (y0 + 0 * sep) * 4, w * 4, h * 4)),
+            ("dificultad", "DIFICULTAD",
+             pygame.Rect((cx_m - w // 2) * 4, (y0 + 1 * sep) * 4, w * 4, h * 4)),
+            ("salir",      "SALIR",
+             pygame.Rect((cx_m - w // 2) * 4, (y0 + 2 * sep) * 4, w * 4, h * 4)),
         ]
 
         self.hover = None
@@ -60,24 +67,40 @@ class EscenaMenu(Escena):
             sys.exit()
 
     def draw(self):
-        # Fondo en el mundo
+        # Fondo negro en el mundo
         self.pantalla.fill(NEGRO)
 
-        # Textos en la UI
-        self.render._texto_centrado_ui(TITULO, self.fuentes["grande"], AMARILLO,
-                                        ANCHO // 2, 90)
-        self.render._texto_centrado_ui(f"v{VERSION}", self.fuentes["chica"], GRIS,
-                                        ANCHO // 2, 130)
-        self.render._texto_centrado_ui("Elegi una opcion",
-                                        self.fuentes["normal"], BLANCO,
-                                        ANCHO // 2, 180)
+        # Coordenadas del mundo
+        ancho_m = ANCHO // 4
+        alto_m = ALTO // 4
+        cx_m = ancho_m // 2
 
-        # Botones (dibujan fondo en mundo + texto en UI)
+        # --- Titulo (arriba) ---
+        self.render._texto_centrado_mundo(
+            TITULO, self.fuentes["grande"], AMARILLO,
+            cx_m, 14
+        )
+
+        # --- Version (debajo del titulo) ---
+        self.render._texto_centrado_mundo(
+            f"v{VERSION}", self.fuentes["chica"], GRIS,
+            cx_m, 34
+        )
+
+        # --- Subtitulo ---
+        self.render._texto_centrado_mundo(
+            "Elegi una opcion", self.fuentes["normal"], BLANCO,
+            cx_m, 58
+        )
+
+        # --- Botones (dibujados en el mundo) ---
         for clave, texto, rect in self.botones:
             hover = (self.hover == clave)
             self.render.dibujar_boton(rect, texto, hover,
                                       COLOR_BTN_VERDE, COLOR_BTN_VERDE_OFF)
 
-        self.render._texto_centrado_ui("ESC para salir",
-                                        self.fuentes["chica"], GRIS,
-                                        ANCHO // 2, ALTO - 30)
+        # --- Pie: ESC para salir ---
+        self.render._texto_centrado_mundo(
+            "ESC para salir", self.fuentes["chica"], GRIS,
+            cx_m, alto_m - 14
+        )

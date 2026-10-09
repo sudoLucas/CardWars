@@ -1,7 +1,7 @@
 # escenas/juego.py
 import pygame
 from config import (
-    ANCHO, ALTO, Layout, Botones, Turno,
+    ANCHO, ALTO, Layout, Botones, Turno, ESCALA_PIXEL,
     DUELO_DURACION, get_dificultad,
 )
 from escenas.base import Escena
@@ -19,52 +19,56 @@ class EscenaJuego(Escena):
         self.juego = Juego(self.dificultad)
         self.tiempo_resolucion = 0
 
-        # Botones
+        e = ESCALA_PIXEL
+
+        # Botones en PANTALLA REAL (para los clicks).
         self.boton_reiniciar = pygame.Rect(
-            ANCHO // 2 - Botones.REINICIAR_W // 2, Botones.REINICIAR_Y,
-            Botones.REINICIAR_W, Botones.REINICIAR_H,
+            Botones.REINICIAR_X * e,
+            Botones.REINICIAR_Y * e,
+            Botones.REINICIAR_W * e,
+            Botones.REINICIAR_H * e,
         )
         self.boton_siguiente = pygame.Rect(
-            ANCHO // 2 - Botones.SIGUIENTE_W // 2, Botones.SIGUIENTE_Y,
-            Botones.SIGUIENTE_W, Botones.SIGUIENTE_H,
+            Botones.SIGUIENTE_X * e,
+            Botones.SIGUIENTE_Y * e,
+            Botones.SIGUIENTE_W * e,
+            Botones.SIGUIENTE_H * e,
         )
 
         self.rects_jugador = []
         self.rects_enemigo = []
 
-    # ---------- Helpers ----------
     def nueva_partida(self):
         self.juego = Juego(self.dificultad)
         self.tiempo_resolucion = 0
 
+    def _ancho_mundo(self):
+        return ANCHO // ESCALA_PIXEL
+
     def calcular_rects(self):
-        # --- Cartas del jugador: solo las VIVAS, reacomodadas ---
-        vivas_jugador = [(i, c) for i, c in enumerate(self.juego.mazo_jugador.cartas) if c.viva]
-        cantidad_j = len(vivas_jugador)
+        e = ESCALA_PIXEL
+        ancho_m = self._ancho_mundo()
+
+        # --- Cartas del jugador (vivas) ---
+        vivas_j = [(i, c) for i, c in enumerate(self.juego.mazo_jugador.cartas) if c.viva]
+        cantidad_j = len(vivas_j)
         self.rects_jugador = []
 
         if cantidad_j > 0:
-            x_inicio = Layout.x_inicio_cartas(cantidad_j, ANCHO)
-            for pos, (idx_real, _) in enumerate(vivas_jugador):
-                x = x_inicio + pos * (Layout.CARTA_W + Layout.ESPACIO_CARTAS)
-                self.rects_jugador.append(
-                    (idx_real, pygame.Rect(x, Layout.Y_CARTAS_TU, Layout.CARTA_W, Layout.CARTA_H))
+            x_inicio_m = Layout.x_inicio_cartas(cantidad_j, ancho_m)
+            for pos, (idx_real, _) in enumerate(vivas_j):
+                x_m = x_inicio_m + pos * (Layout.CARTA_W + Layout.ESPACIO_CARTAS)
+                rect = pygame.Rect(
+                    x_m * e, Layout.Y_TOP_MANO * e,
+                    Layout.CARTA_W * e, Layout.CARTA_H * e,
                 )
+                self.rects_jugador.append((idx_real, rect))
 
-        # --- Cartas del rival: solo las VIVAS ---
-        vivas_rival = [(i, c) for i, c in enumerate(self.juego.mazo_enemigo.cartas) if c.viva]
-        cantidad_e = len(vivas_rival)
-        self.rects_enemigo = []
+        # --- Cartas del rival (solo índices) ---
+        vivas_e = [(i, c) for i, c in enumerate(self.juego.mazo_enemigo.cartas) if c.viva]
+        self.rects_enemigo = [(idx_real, pygame.Rect(0, 0, 0, 0))
+                              for idx_real, _ in vivas_e]
 
-        if cantidad_e > 0:
-            x_inicio = Layout.x_inicio_cartas(cantidad_e, ANCHO)
-            for pos, (idx_real, _) in enumerate(vivas_rival):
-                x = x_inicio + pos * (Layout.CARTA_W + Layout.ESPACIO_CARTAS)
-                self.rects_enemigo.append(
-                    (idx_real, pygame.Rect(x, Layout.Y_CARTAS_RIVAL, Layout.CARTA_W, Layout.CARTA_H))
-                )
-
-    # ---------- Eventos ----------
     def handle_event(self, evento):
         mouse = pygame.mouse.get_pos()
 
@@ -96,23 +100,19 @@ class EscenaJuego(Escena):
                     self.juego.siguiente_ronda()
                     self.tiempo_resolucion = 0
 
-    # ---------- Update ----------
     def update(self, dt):
         self.render.tick(dt)
         self.calcular_rects()
 
-        # Auto-avance de ronda
         if self.juego.turno == Turno.RESOLVIENDO:
             if pygame.time.get_ticks() - self.tiempo_resolucion > DUELO_DURACION:
                 self.juego.siguiente_ronda()
                 self.tiempo_resolucion = 0
 
-        # Si terminó, ir a la escena de fin
         if self.juego.turno == Turno.FIN:
             from escenas.fin import EscenaFin
             self.app.cambiar_escena(EscenaFin(self.app, self.juego))
 
-    # ---------- Draw ----------
     def draw(self):
         mouse = pygame.mouse.get_pos()
         self.render.dibujar_escena(
