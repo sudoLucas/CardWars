@@ -90,7 +90,7 @@ class App:
             self.escena.update(dt)
             self.escena.draw()
 
-            # 1) Escalar el MUNDO a la resolucion interna
+            # 1) Escalar el MUNDo a la resolucion interna
             mundo_escalado = pygame.transform.scale(
                 self.surface_mundo,
                 (self.ancho_interno, self.alto_interno),
