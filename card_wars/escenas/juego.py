@@ -21,7 +21,6 @@ class EscenaJuego(Escena):
 
         e = ESCALA_PIXEL
 
-        # Botones en PANTALLA REAL (para los clicks).
         self.boton_reiniciar = pygame.Rect(
             Botones.REINICIAR_X * e,
             Botones.REINICIAR_Y * e,
@@ -37,6 +36,7 @@ class EscenaJuego(Escena):
 
         self.rects_jugador = []
         self.rects_enemigo = []
+        self.mouse = (0, 0)   # guardamos el mouse para usarlo en draw
 
     def nueva_partida(self):
         self.juego = Juego(self.dificultad)
@@ -49,7 +49,6 @@ class EscenaJuego(Escena):
         e = ESCALA_PIXEL
         ancho_m = self._ancho_mundo()
 
-        # --- Cartas del jugador (vivas) ---
         vivas_j = [(i, c) for i, c in enumerate(self.juego.mazo_jugador.cartas) if c.viva]
         cantidad_j = len(vivas_j)
         self.rects_jugador = []
@@ -64,13 +63,13 @@ class EscenaJuego(Escena):
                 )
                 self.rects_jugador.append((idx_real, rect))
 
-        # --- Cartas del rival (solo índices) ---
         vivas_e = [(i, c) for i, c in enumerate(self.juego.mazo_enemigo.cartas) if c.viva]
         self.rects_enemigo = [(idx_real, pygame.Rect(0, 0, 0, 0))
                               for idx_real, _ in vivas_e]
 
-    def handle_event(self, evento):
-        mouse = pygame.mouse.get_pos()
+    def handle_event(self, evento, mouse):
+        # Guardamos el mouse para usarlo en draw (hover de cartas)
+        self.mouse = mouse
 
         if evento.type == pygame.KEYDOWN:
             if evento.key == pygame.K_ESCAPE:
@@ -114,8 +113,8 @@ class EscenaJuego(Escena):
             self.app.cambiar_escena(EscenaFin(self.app, self.juego))
 
     def draw(self):
-        mouse = pygame.mouse.get_pos()
+        # Usamos el mouse guardado (ya traducido)
         self.render.dibujar_escena(
-            self.juego, self.rects_jugador, self.rects_enemigo, mouse,
+            self.juego, self.rects_jugador, self.rects_enemigo, self.mouse,
             self.boton_reiniciar, self.boton_siguiente,
         )

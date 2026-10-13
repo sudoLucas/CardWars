@@ -2,44 +2,51 @@
 import sys
 import pygame
 
-from config import TITULO, VERSION, ANCHO, ALTO, FPS, DIFICULTAD_DEFAULT
+import config
+from config import (
+    TITULO, VERSION, FPS, DIFICULTAD_DEFAULT, ESCALA_PIXEL,
+    RESOLUCION_INTERNA_W, RESOLUCION_INTERNA_H,
+)
 from vista.fuentes import cargar_fuentes
 from vista.render import Render
 from escenas.menu import EscenaMenu
-
-
-ESCALA_PIXEL = 4
 
 
 class App:
     def __init__(self):
         pygame.init()
 
-        # Ventana real (NO la pisamos nunca)
-        self.ventana = pygame.display.set_mode((ANCHO, ALTO))
+        # Tamano REAL de la ventana (900x600 por defecto)
+        self.ancho_ventana, self.alto_ventana = config.inicializar_ventana()
+        self.ventana = pygame.display.set_mode(
+            (self.ancho_ventana, self.alto_ventana)
+        )
         pygame.display.set_caption(f"{TITULO} v{VERSION}")
         self.reloj = pygame.time.Clock()
 
-        # Surface del mundo (baja resolucion)
-        self.surface_mundo = pygame.Surface((ANCHO // ESCALA_PIXEL, ALTO // ESCALA_PIXEL))
+        # Resolucion INTERNA (siempre 1200x800)
+        self.ancho_interno = RESOLUCION_INTERNA_W
+        self.alto_interno = RESOLUCION_INTERNA_H
 
-        # Surface de UI (resolucion completa, con alpha)
-        self.surface_ui = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
+        # Superficies internas
+        self.surface_mundo = pygame.Surface(
+            (self.ancho_interno // ESCALA_PIXEL,
+             self.alto_interno // ESCALA_PIXEL)
+        )
+        self.surface_ui = pygame.Surface(
+            (self.ancho_interno, self.alto_interno),
+            pygame.SRCALPHA,
+        )
+        self.surface_frame = pygame.Surface(
+            (self.ancho_interno, self.alto_interno)
+        )
 
-        # Fuentes
         self.fuentes = cargar_fuentes()
-
-        # Render
         self.render = Render(self.surface_mundo, self.surface_ui, self.fuentes)
-
-        # Alias para compatibilidad con las escenas (que usan self.pantalla)
-        # Apunta al MUNDO, donde las escenas dibujan las formas.
         self.pantalla = self.surface_mundo
 
-        # Estado global
         self.clave_dificultad = DIFICULTAD_DEFAULT
         self.escena = None
-
         self.cambiar_escena(EscenaMenu(self))
 
     def cambiar_escena(self, nueva_escena):
@@ -48,29 +55,61 @@ class App:
         self.escena = nueva_escena
         self.escena.on_enter()
 
+    def _pos_interna(self, pos):
+        """Convierte una posicion de la ventana real a coords internas."""
+        mx, my = pos
+        return (
+            int(mx * self.ancho_interno / self.ancho_ventana),
+            int(my * self.alto_interno / self.alto_ventana),
+        )
+
+    def _mouse_interno(self):
+        """Posicion actual del mouse en coords internas."""
+        return self._pos_interna(pygame.mouse.get_pos())
+
     def run(self):
         while True:
             dt = self.reloj.tick(FPS)
+
+            # Mouse traducido al espacio interno
+            mouse = self._mouse_interno()
 
             for evento in pygame.event.get():
                 if evento.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                self.escena.handle_event(evento)
+
+                # Si el evento trae posicion, actualizamos el mouse
+                if evento.type in (pygame.MOUSEBUTTONDOWN,
+                                   pygame.MOUSEBUTTONUP,
+                                   pygame.MOUSEMOTION):
+                    mouse = self._pos_interna(evento.pos)
+
+                self.escena.handle_event(evento, mouse)
 
             self.escena.update(dt)
             self.escena.draw()
 
-            # Escalar el MUNDO
-            mundo_escalado = pygame.transform.scale(self.surface_mundo, (ANCHO, ALTO))
+            # 1) Escalar el MUNDO a la resolucion interna
+            mundo_escalado = pygame.transform.scale(
+                self.surface_mundo,
+                (self.ancho_interno, self.alto_interno),
+            )
 
-            # Componer en la VENTANA real
-            self.ventana.blit(mundo_escalado, (0, 0))
-            self.ventana.blit(self.surface_ui, (0, 0))
+            # 2) Componer mundo + UI en el frame interno
+            self.surface_frame.blit(mundo_escalado, (0, 0))
+            self.surface_frame.blit(self.surface_ui, (0, 0))
 
+            # 3) Escalar el frame al tamano de la ventana
+            frame_escalado = pygame.transform.scale(
+                self.surface_frame,
+                (self.ancho_ventana, self.alto_ventana),
+            )
+
+            # 4) Blitear a la ventana
+            self.ventana.blit(frame_escalado, (0, 0))
             pygame.display.flip()
 
-            # Limpiar la UI para el proximo frame
             self.surface_ui.fill((0, 0, 0, 0))
 
 

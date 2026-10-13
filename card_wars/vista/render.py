@@ -10,6 +10,7 @@ from vista.colores import (
     COLOR_FONDO_BARRA, COLOR_INFO,
     COLOR_BTN_VERDE, COLOR_BTN_VERDE_OFF,
     COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF,
+    COLOR_BORDE_BOTON, COLOR_BORDE_BOTON_HOVER,
 )
 
 OLA_AMPLITUD   = 5.0
@@ -133,19 +134,15 @@ class Render:
         rect_m = pygame.Rect(x_i, y_i, w, h)
         pygame.draw.rect(self.mundo, color, rect_m)
 
-        # Borde: amarillo grueso si esta destacada (carta en duelo),
-        # blanco fino si no.
         if destacada:
             pygame.draw.rect(self.mundo, AMARILLO, rect_m, 2)
         else:
             borde = AMARILLO if resaltada else BLANCO
             pygame.draw.rect(self.mundo, borde, rect_m, 1)
 
-        # Nombre
         self._texto_mundo(carta.nombre[:8], self.f["mini"], BLANCO,
                           x_i + 2, y_i + 2)
 
-        # Poder
         poder_txt = str(carta.poder) if carta.viva else "0"
         poder_color = AMARILLO if carta.viva else GRIS_OSCURO
         cx = x_i + w // 2
@@ -198,19 +195,41 @@ class Render:
                                    x_m + w_m // 2, y_m + h_m // 2 - 3)
 
     # ==================================================
-    # BOTON
+    # BOTON (con borde de color)
     # ==================================================
-    def dibujar_boton(self, rect, texto, hover, color_on, color_off):
+    def dibujar_boton(self, rect, texto, hover, color_on, color_off,
+                      borde_color=None, borde_grosor=2):
+        """
+        Dibuja un boton en el mundo con un borde de color alrededor.
+        - rect: pygame.Rect en pantalla real (se divide por escala)
+        - borde_color: color del borde (None = usa el default segun hover)
+        - borde_grosor: grosor del borde en unidades del MUNDO
+        """
         x_m = rect[0] // self.e
         y_m = rect[1] // self.e
         w_m = rect[2] // self.e
         h_m = rect[3] // self.e
 
         color_base = color_on if hover else color_off
+
+        # Elegir color del borde si no viene uno custom
+        if borde_color is None:
+            borde_color = COLOR_BORDE_BOTON_HOVER if hover else COLOR_BORDE_BOTON
+
+        # Fondo del boton
         rect_m = pygame.Rect(x_m, y_m, w_m, h_m)
         pygame.draw.rect(self.mundo, color_base, rect_m)
-        pygame.draw.rect(self.mundo, BLANCO, rect_m, 1)
 
+        # Borde del contenedor (dibujado por dentro)
+        if borde_grosor > 0:
+            for i in range(borde_grosor):
+                borde_rect = pygame.Rect(
+                    x_m + i, y_m + i,
+                    w_m - i * 2, h_m - i * 2
+                )
+                pygame.draw.rect(self.mundo, borde_color, borde_rect, 1)
+
+        # Texto centrado
         self._texto_centrado_mundo(texto, self.f["mini"], BLANCO,
                                    x_m + w_m // 2, y_m + h_m // 2 - 4)
         return rect
@@ -225,9 +244,6 @@ class Render:
         ancho_m = self.mundo.get_width()
         alto_m = self.mundo.get_height()
 
-        # ==================================================
-        # HP (rival izq, jugador der)
-        # ==================================================
         hp_w = 70
         hp_h = 8
         self.dibujar_hp(3, 3, juego.hp_enemigo, juego.hp_enemigo_max,
@@ -236,9 +252,7 @@ class Render:
                         juego.hp_jugador, juego.hp_jugador_max,
                         "TU", (0, 144, 248), hp_w, hp_h)
 
-        # ==================================================
-        # ABANICO DEL RIVAL
-        # ==================================================
+        # --- Abanico del rival ---
         cantidad_e = len(rects_enemigo)
         cx_centro = ancho_m // 2
         cy_centro = Layout.Y_CENTRO_RIVAL
@@ -268,34 +282,27 @@ class Render:
                 surf = self._superficie_dorso()
                 self.dibujar_carta_rotada(cx, cy_ola, surf, angulos[i])
 
-        # ==================================================
-        # ZONA DE DUELO
-        # ==================================================
+        # --- Zona de duelo ---
         cx_duelo = ancho_m // 2
         cy_duelo = Layout.Y_CENTRO_DUELO
 
-        # Carta del rival (arriba)
         if juego.carta_jugada_enemigo is not None:
             ce = juego.mazo_enemigo[juego.carta_jugada_enemigo]
             x = cx_duelo - Layout.CARTA_W // 2
             y = cy_duelo - Layout.CARTA_H - Layout.DUELO_SEP_Y - 2
             self.dibujar_carta(x, y, ce, COLOR_ENEMIGO, destacada=True)
 
-        # Carta del jugador (abajo, la ultima en dibujarse = queda adelante)
         if juego.carta_jugada_jugador is not None:
             cj = juego.mazo_jugador[juego.carta_jugada_jugador]
             x = cx_duelo - Layout.CARTA_W // 2
             y = cy_duelo + Layout.DUELO_SEP_Y
             self.dibujar_carta(x, y, cj, COLOR_JUGADOR, destacada=True)
 
-        # VS en el medio
         if juego.carta_jugada_enemigo is not None or juego.carta_jugada_jugador is not None:
             self._texto_centrado_mundo("VS", self.f["chica"], AMARILLO,
                                        cx_duelo, Layout.Y_VS)
 
-        # ==================================================
-        # MANO DEL JUGADOR
-        # ==================================================
+        # --- Mano del jugador ---
         for idx_real, rect in rects_jugador:
             carta = juego.mazo_jugador.cartas[idx_real]
             hover_j = rect.collidepoint(mouse) and juego.turno == Turno.JUGADOR
@@ -305,9 +312,7 @@ class Render:
             self.dibujar_carta(x_m, y_m, carta, COLOR_JUGADOR,
                                hover=hover_j, ola=True)
 
-        # ==================================================
-        # BOTONES (abajo, uno de cada lado)
-        # ==================================================
+        # --- Botones ---
         hover_re = btn_reiniciar.collidepoint(mouse)
         self.dibujar_boton(btn_reiniciar, "REINICIAR", hover_re,
                            COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF)
@@ -317,13 +322,10 @@ class Render:
             self.dibujar_boton(btn_siguiente, "SIGUIENTE", hover_sig,
                                COLOR_BTN_VERDE, COLOR_BTN_VERDE_OFF)
 
-        # ==================================================
-        # MENSAJE DE ESTADO (entre el duelo y la mano, con color llamativo)
-        # ==================================================
+        # --- Mensaje de estado ---
         if juego.turno == Turno.JUGADOR:
             self._texto_centrado_mundo("TU TURNO", self.f["normal"],
                                        AMARILLO, cx_duelo, Layout.Y_MENSAJE)
         elif juego.turno == Turno.RESOLVIENDO:
-            # Naranja brillante para que se lea sobre cualquier cosa
             self._texto_centrado_mundo("COMBATE", self.f["normal"],
                                        (255, 160, 40), cx_duelo, Layout.Y_MENSAJE)

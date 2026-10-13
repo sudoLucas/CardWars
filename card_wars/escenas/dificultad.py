@@ -1,12 +1,16 @@
 # escenas/dificultad.py
+import os
 import pygame
-from config import ANCHO, ALTO, DIFICULTADES, Botones, ESCALA_PIXEL
+from config import ANCHO, ALTO, DIFICULTADES, Botones, ESCALA_PIXEL, DIRECTORIO_RAIZ
 from escenas.base import Escena
 from vista.colores import (
     NEGRO, BLANCO, AMARILLO, GRIS,
     COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF,
     COLOR_BTN_VERDE, COLOR_BTN_VERDE_OFF,
 )
+
+
+RUTA_FONDO_MENU = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "menuFondo.png")
 
 
 class EscenaDificultad(Escena):
@@ -16,37 +20,51 @@ class EscenaDificultad(Escena):
         e = ESCALA_PIXEL
         ancho_m = ANCHO // e
         alto_m = ALTO // e
-        cx_m = ancho_m // 2
 
         w = Botones.DIFICULTAD_W
         h = Botones.DIFICULTAD_H
         sep = Botones.DIFICULTAD_ESPACIO_Y
-        y0 = 70
+        margen_x = Botones.MENU_X_MARGEN
+        margen_y = Botones.MENU_Y_MARGEN
 
-        # Los botones se guardan en PANTALLA REAL (x4) para los clicks
-        self.botones = []
         claves = ["facil", "normal", "duro"]
-        for i, clave in enumerate(claves):
-            cfg = DIFICULTADES[clave]
-            texto = cfg.nombre
-            x = (cx_m - w // 2) * e
-            y = (y0 + i * sep) * e
-            rect = pygame.Rect(x, y, w * e, h * e)
-            self.botones.append((clave, texto, rect))
 
-        # Boton volver
-        y_volver = y0 + 3 * sep + 15
+        # --- 3 botones pegados al borde inferior izquierdo ---
+        # Misma logica que el menu: el ULTIMO boton arriba del margen inferior.
+        n = len(claves)
+        y_ultimo = alto_m - margen_y - h
+
+        self.botones = []
+        for i in range(n):
+            y_m = y_ultimo - (n - 1 - i) * (h + sep)
+            x_m = margen_x
+            rect = pygame.Rect(x_m * e, y_m * e, w * e, h * e)
+            cfg = DIFICULTADES[claves[i]]
+            self.botones.append((claves[i], cfg.nombre, rect))
+
+        # --- Boton VOLVER, arriba de todo ---
+        # Va por encima del primer boton (facil)
+        y_volver = y_ultimo - n * (h + sep)
         self.boton_volver = pygame.Rect(
-            (cx_m - w // 2) * e,
+            margen_x * e,
             y_volver * e,
             w * e, h * e,
         )
 
         self.hover = None
 
-    def handle_event(self, evento):
-        mouse = pygame.mouse.get_pos()
+        # Imagen de fondo (igual que menu)
+        self.fondo = None
+        if os.path.isfile(RUTA_FONDO_MENU):
+            try:
+                img = pygame.image.load(RUTA_FONDO_MENU).convert()
+                self.fondo = pygame.transform.smoothscale(img, (ANCHO, ALTO))
+            except Exception as e:
+                print(f"[dificultad] No se pudo cargar la imagen de fondo: {e}")
+        else:
+            print(f"[dificultad] Imagen NO ENCONTRADA: {RUTA_FONDO_MENU}")
 
+    def handle_event(self, evento, mouse):
         self.hover = None
         for clave, _, rect in self.botones:
             if rect.collidepoint(mouse):
@@ -71,26 +89,27 @@ class EscenaDificultad(Escena):
                 self.app.cambiar_escena(EscenaMenu(self.app))
 
     def draw(self):
-        # Fondo negro
-        self.pantalla.fill(NEGRO)
-
-        # Coordenadas del mundo
         ancho_m = ANCHO // ESCALA_PIXEL
         alto_m = ALTO // ESCALA_PIXEL
-        cx_m = ancho_m // 2
 
-        # Titulo
-        self.render._texto_centrado_mundo(
+        self.pantalla.fill(NEGRO)
+
+        if self.fondo is not None:
+            self.render.ui.blit(self.fondo, (0, 0))
+
+        # Textos alineados a la izquierda (mismo margen que los botones)
+        x_texto = Botones.MENU_X_MARGEN
+
+        self.render._texto_mundo(
             "DIFICULTAD", self.fuentes["grande"], AMARILLO,
-            cx_m, 15
+            x_texto, 14
         )
-        # Subtitulo
-        self.render._texto_centrado_mundo(
-            "Elegi el nivel de desafio", self.fuentes["normal"], BLANCO,
-            cx_m, 45
+        self.render._texto_mundo(
+            "Elegi el nivel", self.fuentes["normal"], BLANCO,
+            x_texto, 45
         )
 
-        # Botones + descripcion debajo de cada uno
+        # Botones
         for clave, texto, rect in self.botones:
             hover = (self.hover == clave)
             actual = (clave == self.app.clave_dificultad)
@@ -98,19 +117,11 @@ class EscenaDificultad(Escena):
             color_on = COLOR_BTN_VERDE if actual else COLOR_BTN_AZUL
             color_off = COLOR_BTN_VERDE_OFF if actual else COLOR_BTN_AZUL_OFF
 
-            self.render.dibujar_boton(rect, texto, hover, color_on, color_off)
+            self.render.dibujar_boton(rect, texto, hover, color_on, color_off,
+                                      borde_grosor=Botones.MENU_BORDE_GROSOR)
 
-            # Descripcion debajo del boton
-            cfg = DIFICULTADES[clave]
-            y_desc_m = rect.y // ESCALA_PIXEL + Botones.DIFICULTAD_H + 4
-            self.render._texto_centrado_mundo(
-                cfg.descripcion, self.fuentes["chica"], GRIS,
-                cx_m, y_desc_m
-            )
-
-        # Boton VOLVER
-        self.render.dibujar_boton(
-            self.boton_volver, "VOLVER",
-            self.hover == "volver",
-            COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF
+        # Pie
+        self.render._texto_centrado_mundo(
+            "ESC para volver", self.fuentes["chica"], GRIS,
+            ancho_m - 40, alto_m - 14
         )

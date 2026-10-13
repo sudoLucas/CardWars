@@ -7,8 +7,8 @@ class Escena:
 
     def __init__(self, app):
         self.app = app
-        self.pantalla = app.pantalla          # surface_mundo (pixelada)
-        self.surface_ui = app.surface_ui      # surface_ui (nitida)
+        self.pantalla = app.pantalla
+        self.surface_ui = app.surface_ui
         self.fuentes = app.fuentes
         self.render = app.render
 
@@ -18,7 +18,10 @@ class Escena:
     def on_exit(self):
         pass
 
-    def handle_event(self, evento):
+    def handle_event(self, evento, mouse):
+        """
+        mouse ya viene traducido al espacio interno (1200x800).
+        """
         pass
 
     def update(self, dt):

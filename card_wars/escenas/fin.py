@@ -27,9 +27,8 @@ class EscenaFin(Escena):
         ]
         self.hover = None
 
-    def handle_event(self, evento):
-        mouse = pygame.mouse.get_pos()
-
+    def handle_event(self, evento, mouse):
+        # hover
         self.hover = None
         for clave, _, rect in self.botones:
             if rect.collidepoint(mouse):

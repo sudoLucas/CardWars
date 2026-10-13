@@ -26,11 +26,15 @@ COLOR_DORSO          = (168, 16, 48)     # Bordó de reverso
 COLOR_FONDO_BARRA    = (40, 40, 48)      # Fondos oscuros
 COLOR_LINEA_DUELO    = (120, 120, 144)   # Separadores
 COLOR_INFO           = (232, 232, 248)   # Cajas de diálogo
-COLOR_ETIQ_RIVAL     = (248, 104, 104)   
-COLOR_ETIQ_JUGADOR   = (104, 168, 248)   
+COLOR_ETIQ_RIVAL     = (248, 104, 104)
+COLOR_ETIQ_JUGADOR   = (104, 168, 248)
 
 # Botones
 COLOR_BTN_VERDE      = (0, 216, 0)
 COLOR_BTN_VERDE_OFF  = (0, 120, 0)
 COLOR_BTN_AZUL       = (0, 168, 248)
 COLOR_BTN_AZUL_OFF   = (0, 88, 168)
+
+# Borde de los botones (contenedor)
+COLOR_BORDE_BOTON        = (255, 220, 60)    # amarillo dorado (normal)
+COLOR_BORDE_BOTON_HOVER  = (255, 255, 180)   # amarillo claro (hover)
