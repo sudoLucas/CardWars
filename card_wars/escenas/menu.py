@@ -29,12 +29,13 @@ FONDO_ZOOM       = 1.10
 FONDO_VELOCIDAD  = 0.0004
 
 # MEDIO -> velocidad media (mas sutil)
-MEDIO_ZOOM       = 1.06
+MEDIO_ZOOM       = 1.25
 MEDIO_VELOCIDAD  = 0.0004
 
 # FRENTE (mas cercano) -> mas zoom (mas sutil)
 FRENTE_ZOOM      = 1.20
 FRENTE_VELOCIDAD = 0.0007
+FRENTE_OFFSET_Y = 80
 
 
 class EscenaMenu(Escena):
