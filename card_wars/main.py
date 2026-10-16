@@ -46,6 +46,10 @@ class App:
         self.pantalla = self.surface_mundo
 
         self.clave_dificultad = DIFICULTAD_DEFAULT
+
+        # Tiempo compartido entre escenas (para que el fondo no se resetee)
+        self.tiempo_fondo = 0.0
+
         self.escena = None
         self.cambiar_escena(EscenaMenu(self))
 
@@ -90,7 +94,7 @@ class App:
             self.escena.update(dt)
             self.escena.draw()
 
-            # 1) Escalar el MUNDo a la resolucion interna
+            # 1) Escalar el MUNDO a la resolucion interna
             mundo_escalado = pygame.transform.scale(
                 self.surface_mundo,
                 (self.ancho_interno, self.alto_interno),

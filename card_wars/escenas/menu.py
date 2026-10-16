@@ -21,19 +21,37 @@ RUTA_COLINA_MEDIO  = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina
 RUTA_COLINA_FONDO  = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina3.png")
 
 
-FONDO_ZOOM       = 1.10
-FONDO_VELOCIDAD  = 0.0004
+# ============================================================
+# AJUSTES DE LAS COLINAS (todos en 0, ajustar a mano)
+# ============================================================
+# ZOOM: 1.0 = tamano original. 1.5 = 50% mas grande. 0.8 = 20% mas chica.
+# VELOCIDAD: 0.0 = quieta. 0.0002 = lenta. 0.0010 = rapida.
+# OFFSET_X: positivo = mueve a la DERECHA. negativo = mueve a la IZQUIERDA.
+# OFFSET_Y: positivo = mueve hacia ABAJO. negativo = mueve hacia ARRIBA.
 
-MEDIO_ZOOM       = 1.25
-MEDIO_VELOCIDAD  = 0.0004
+# --- Capa FONDO (colina3, la mas lejana) ---
+FONDO_ZOOM        = 1.25
+FONDO_VELOCIDAD   = 0.0001
+FONDO_OFFSET_X    = 50
+FONDO_OFFSET_Y    = 0
 
-FRENTE_ZOOM      = 1.60
-FRENTE_VELOCIDAD = 0.0007
+# --- Capa MEDIO (colina2) ---
+MEDIO_ZOOM        = 1.25
+MEDIO_VELOCIDAD   = 0.0002
+MEDIO_OFFSET_X    = 25
+MEDIO_OFFSET_Y    = -100
 
-# Duracion del subrayado animado (en segundos)
+# --- Capa FRENTE (colina1, la mas cercana) ---
+FRENTE_ZOOM       = 1.5
+FRENTE_VELOCIDAD  = 0.0005
+FRENTE_OFFSET_X   = 0
+FRENTE_OFFSET_Y   = -320
+
+
+# ============================================================
+# AJUSTES DE LOS BOTONES
+# ============================================================
 SUBRAYADO_DURACION = 2.0
-
-# Escala del texto cuando el boton esta seleccionado
 ESCALA_SELECCIONADO = 1.4
 
 
@@ -64,15 +82,12 @@ class EscenaMenu(Escena):
         self.hover = None
         self.indice = 0
 
-        # Timers del subrayado animado (0.0 a 1.0)
         self.timers_subrayado = [0.0] * len(self.botones)
         self.indice_anterior = 0
 
         self.capa_fondo = self._cargar(RUTA_COLINA_FONDO, "colina3")
         self.capa_medio = self._cargar(RUTA_COLINA_MEDIO, "colina2")
         self.capa_frente = self._cargar(RUTA_COLINA_FRENTE, "colina1")
-
-        self.tiempo_fondo = 0.0
 
     def _cargar(self, ruta, nombre):
         if os.path.isfile(ruta):
@@ -120,7 +135,8 @@ class EscenaMenu(Escena):
             pygame.quit()
             sys.exit()
 
-    def _dibujar_capa(self, imagen, zoom, velocidad, fase):
+    def _dibujar_capa(self, imagen, zoom, velocidad, fase,
+                      offset_x=0, offset_y=0):
         if imagen is None:
             return
 
@@ -134,19 +150,43 @@ class EscenaMenu(Escena):
         AMPLITUD_X = 0.30
         AMPLITUD_Y = 0.20
 
-        t = self.tiempo_fondo * velocidad + fase
+        t = self.app.tiempo_fondo * velocidad + fase
         off_x = (math.sin(t) * 0.5 + 0.5) * AMPLITUD_X * margen_x
         off_y = (math.cos(t * 0.7) * 0.5 + 0.5) * AMPLITUD_Y * margen_y
 
-        self.render.ui.blit(img_zoom, (-int(off_x), -int(off_y)))
+        x_final = -int(off_x) + offset_x
+        y_final = -int(off_y) + offset_y
+
+        self.render.ui.blit(img_zoom, (x_final, y_final))
 
     def _dibujar_fondo(self):
-        self._dibujar_capa(self.capa_fondo, zoom=FONDO_ZOOM,
-                           velocidad=FONDO_VELOCIDAD, fase=0.0)
-        self._dibujar_capa(self.capa_medio, zoom=MEDIO_ZOOM,
-                           velocidad=MEDIO_VELOCIDAD, fase=1.3)
-        self._dibujar_capa(self.capa_frente, zoom=FRENTE_ZOOM,
-                           velocidad=FRENTE_VELOCIDAD, fase=2.7)
+        # Colina3 primero (queda atras)
+        self._dibujar_capa(
+            self.capa_fondo,
+            zoom=FONDO_ZOOM,
+            velocidad=FONDO_VELOCIDAD,
+            fase=0.0,
+            offset_x=FONDO_OFFSET_X,
+            offset_y=FONDO_OFFSET_Y,
+        )
+        # Colina2 despues
+        self._dibujar_capa(
+            self.capa_medio,
+            zoom=MEDIO_ZOOM,
+            velocidad=MEDIO_VELOCIDAD,
+            fase=1.3,
+            offset_x=MEDIO_OFFSET_X,
+            offset_y=MEDIO_OFFSET_Y,
+        )
+        # Colina1 ultimo (queda adelante)
+        self._dibujar_capa(
+            self.capa_frente,
+            zoom=FRENTE_ZOOM,
+            velocidad=FRENTE_VELOCIDAD,
+            fase=2.7,
+            offset_x=FRENTE_OFFSET_X,
+            offset_y=FRENTE_OFFSET_Y,
+        )
 
     def draw(self):
         ancho_m = ANCHO // 4
@@ -156,7 +196,6 @@ class EscenaMenu(Escena):
 
         self._dibujar_fondo()
 
-        # --- Textos del titulo (en unidades del mundo, van a UI) ---
         x_texto = Botones.MENU_X_MARGEN
 
         self.render._texto_mundo(
@@ -172,35 +211,28 @@ class EscenaMenu(Escena):
             x_texto, 58
         )
 
-        # --- Botones flotantes (sin fondo, sin borde) ---
         for i, (clave, texto, rect) in enumerate(self.botones):
             seleccionado = (i == self.indice)
 
-            # Renderizamos el texto con la fuente mini
             fuente = self.fuentes["mini"]
             surf = fuente.render(texto, False, BLANCO)
 
-            # Si esta seleccionado, escalamos el surface (esto SIEMPRE crece)
             if seleccionado:
                 nuevo_w = int(surf.get_width() * ESCALA_SELECCIONADO)
                 nuevo_h = int(surf.get_height() * ESCALA_SELECCIONADO)
                 surf = pygame.transform.scale(surf, (nuevo_w, nuevo_h))
 
-            # Posicionamos centrado en el rect
             cx = rect.x + rect.width // 2
             cy = rect.y + rect.height // 2
             x = cx - surf.get_width() // 2
             y = cy - surf.get_height() // 2
 
-            # Sombra
             sombra = pygame.transform.scale(surf, surf.get_size())
             sombra.fill((0, 0, 0, 0), special_flags=pygame.BLEND_RGBA_MULT)
             self.render.ui.blit(sombra, (x + 2, y + 2))
 
-            # Texto
             self.render.ui.blit(surf, (x, y))
 
-            # Subrayado animado debajo del texto
             if seleccionado:
                 progreso = self.timers_subrayado[i]
                 ancho_total = surf.get_width()
@@ -213,21 +245,18 @@ class EscenaMenu(Escena):
                         (x_sub, y_sub, ancho_actual, 3)
                     )
 
-        # --- Pie ---
         self.render._texto_centrado_mundo(
             "ESC para salir", self.fuentes["chica"], GRIS,
             ancho_m - 40, alto_m - 14
         )
 
     def update(self, dt):
-        self.tiempo_fondo += dt
+        self.app.tiempo_fondo += dt
 
-        # Si el indice cambio, reseteamos el timer del boton anterior
         if self.indice != self.indice_anterior:
             self.timers_subrayado[self.indice_anterior] = 0.0
             self.indice_anterior = self.indice
 
-        # El timer del boton seleccionado crece hasta 1.0 en SUBRAYADO_DURACION seg
         for i in range(len(self.botones)):
             if i == self.indice:
                 self.timers_subrayado[i] = min(
