@@ -194,6 +194,86 @@ class Render:
                                    self.f["mini"], BLANCO,
                                    x_m + w_m // 2, y_m + h_m // 2 - 3)
 
+    def dibujar_barra_hp(self, x, y, hp, hp_max, hp_img, color_lleno):
+        """
+        Dibuja la barra de HP con HP.png como CONTORNO.
+        """
+        if hp_img is None:
+            return
+
+        w, h = hp_img.get_size()
+
+        # ================================================
+        # AJUSTES DEL CUADRADO PINTADO
+        # ================================================
+        FACTOR_ANCHO = 1.0
+        FACTOR_ALTO = 0.12
+        SEPARACION = 0
+        MARGEN_IZQ = 150
+        MARGEN_DER = 80
+        # ================================================
+
+        ancho_util = w - MARGEN_IZQ - MARGEN_DER
+        slot_w = ancho_util // 5
+        slot_h = h
+
+        ancho_cuadro = int(slot_w * FACTOR_ANCHO)
+        alto_cuadro = int(slot_h * FACTOR_ALTO)
+
+        offset_x_cuadro = (slot_w - ancho_cuadro) // 2
+        offset_y_cuadro = (slot_h - alto_cuadro) // 2
+
+        hp_por_cuadro = hp_max / 5.0 if hp_max > 0 else 0
+        if hp_por_cuadro <= 0:
+            return
+
+        cuadros_llenos = int(hp // hp_por_cuadro)
+        cuadros_llenos = max(0, min(5, cuadros_llenos))
+
+        cuadros_con_hp = math.ceil(hp / hp_por_cuadro)
+        cuadros_con_hp = max(0, min(5, cuadros_con_hp))
+
+        capa = pygame.Surface((w, h), pygame.SRCALPHA)
+
+        for i in range(cuadros_llenos):
+            x_cuadro = (
+                MARGEN_IZQ
+                + i * (slot_w + SEPARACION)
+                + offset_x_cuadro
+            )
+            rect_cuadro = pygame.Rect(
+                x_cuadro, offset_y_cuadro, ancho_cuadro, alto_cuadro
+            )
+            capa.fill(color_lleno, rect_cuadro)
+
+        if cuadros_llenos < cuadros_con_hp:
+            i = cuadros_llenos
+
+            hp_restante = hp - (cuadros_llenos * hp_por_cuadro)
+            fraccion = hp_restante / hp_por_cuadro
+            fraccion = max(0.0, min(1.0, fraccion))
+
+            bordo = (60, 0, 0)
+            r = int(bordo[0] + (color_lleno[0] - bordo[0]) * fraccion)
+            g = int(bordo[1] + (color_lleno[1] - bordo[1]) * fraccion)
+            b = int(bordo[2] + (color_lleno[2] - bordo[2]) * fraccion)
+            color_cuadro = (r, g, b)
+
+            ancho_pintado = int(ancho_cuadro * fraccion)
+            if ancho_pintado > 0:
+                x_cuadro = (
+                    MARGEN_IZQ
+                    + i * (slot_w + SEPARACION)
+                    + offset_x_cuadro
+                )
+                rect_parcial = pygame.Rect(
+                    x_cuadro, offset_y_cuadro, ancho_pintado, alto_cuadro
+                )
+                capa.fill(color_cuadro, rect_parcial)
+
+        capa.blit(hp_img, (0, 0))
+        self.ui.blit(capa, (x, y))
+
     # ==================================================
     # BOTON (con borde de color)
     # ==================================================
@@ -224,25 +304,76 @@ class Render:
                                    x_m + w_m // 2, y_m + h_m // 2 - 4)
         return rect
 
-# ==================================================
-# ESCENA COMPLETA
-# ==================================================
+    # ==================================================
+    # ESCENA COMPLETA
+    # ==================================================
     def dibujar_escena(self, juego, rects_jugador, rects_enemigo, mouse,
                        btn_reiniciar, btn_siguiente,
                        emote_rival=None, emote_jugador=None,
-                       emote_activo=False, quien_recibio_dano=None):
+                       emote_activo=False, quien_recibio_dano=None,
+                       hp_img=None):
         self.mundo.fill(COLOR_FONDO_BARRA)
 
         ancho_m = self.mundo.get_width()
         alto_m = self.mundo.get_height()
 
-        hp_w = 70
-        hp_h = 8
-        self.dibujar_hp(3, 3, juego.hp_enemigo, juego.hp_enemigo_max,
-                        "RIVAL", (216, 40, 40), hp_w, hp_h)
-        self.dibujar_hp(ancho_m - hp_w - 3, 3,
-                        juego.hp_jugador, juego.hp_jugador_max,
-                        "TU", (0, 144, 248), hp_w, hp_h)
+        # --- HP con HP.png ---
+        if hp_img is not None:
+            ancho_orig, alto_orig = hp_img.get_size()
+            escala_hp = 1
+            ancho_hp = int(ancho_orig * escala_hp)
+            alto_hp = int(alto_orig * escala_hp)
+            hp_img_chica = pygame.transform.smoothscale(
+                hp_img, (ancho_hp, alto_hp)
+            )
+
+            # ============================================
+            # AJUSTES DE POSICION Y MOVIMIENTO
+            # ============================================
+            # Posicion base de cada barra
+            RIVAL_X_BASE = 10
+            RIVAL_Y_BASE = 4       # mas chico = mas arriba
+            JUGADOR_X_MARGEN_DER = 10
+            JUGADOR_Y_BASE = 30    # mas grande = mas abajo
+
+            # Amplitud del vaiven (en pixeles)
+            AMPLITUD_X = 4
+            AMPLITUD_Y = 4
+            VELOCIDAD = 0.003      # mas alto = mas rapido
+            # ============================================
+
+            # Vaiven diagonal suave
+            t = self.tiempo * VELOCIDAD
+            off_x = int(math.sin(t) * AMPLITUD_X)
+            off_y = int(math.cos(t) * AMPLITUD_Y)
+
+            # Rival: arriba izquierda
+            rival_x = RIVAL_X_BASE + off_x
+            rival_y = RIVAL_Y_BASE + off_y
+            self.dibujar_barra_hp(rival_x, rival_y,
+                                  juego.hp_enemigo, juego.hp_enemigo_max,
+                                  hp_img_chica, (220, 40, 40))
+            self._texto_ui(f"RIVAL: {max(0, juego.hp_enemigo)}",
+                           self.f["mini"], BLANCO,
+                           rival_x, rival_y + alto_hp + 4)
+
+            # Jugador: arriba derecha
+            jugador_x = ANCHO - ancho_hp - JUGADOR_X_MARGEN_DER + off_x
+            jugador_y = JUGADOR_Y_BASE + off_y
+            self.dibujar_barra_hp(jugador_x, jugador_y,
+                                  juego.hp_jugador, juego.hp_jugador_max,
+                                  hp_img_chica, (0, 144, 248))
+            self._texto_ui(f"TU: {max(0, juego.hp_jugador)}",
+                           self.f["mini"], BLANCO,
+                           jugador_x, jugador_y + alto_hp + 4)
+        else:
+            hp_w = 70
+            hp_h = 8
+            self.dibujar_hp(3, 3, juego.hp_enemigo, juego.hp_enemigo_max,
+                            "RIVAL", (216, 40, 40), hp_w, hp_h)
+            self.dibujar_hp(ancho_m - hp_w - 3, 3,
+                            juego.hp_jugador, juego.hp_jugador_max,
+                            "TU", (0, 144, 248), hp_w, hp_h)
 
         # --- Abanico del rival ---
         cantidad_e = len(rects_enemigo)
@@ -334,12 +465,10 @@ class Render:
 
         tam = TAM_AGRANDADO if emote_activo else TAM_NORMAL
 
-        # Flotacion base (siempre activa, para los dos)
         offset_flote = math.sin(
             self.tiempo * FLOTACION_VELOCIDAD
         ) * FLOTACION_AMPLITUD
 
-        # Movimiento extra segun quien recibio dano
         mov_rival_x = 0
         mov_rival_y = 0
         mov_jug_x = 0
@@ -347,34 +476,27 @@ class Render:
 
         if emote_activo:
             if quien_recibio_dano == "rival":
-                # El rival recibe dano: se sacude (impact frame)
                 mov_rival_x = int(math.sin(self.tiempo * 0.08) * 8)
                 mov_rival_y = int(math.cos(self.tiempo * 0.09) * 8)
-                # El jugador gana: movimiento de risa (rebote hacia arriba)
                 mov_jug_y = -int(abs(math.sin(self.tiempo * 0.012)) * 12)
 
             elif quien_recibio_dano == "jugador":
-                # El jugador recibe dano: se sacude (impact frame)
                 mov_jug_x = int(math.sin(self.tiempo * 0.08) * 8)
                 mov_jug_y = int(math.cos(self.tiempo * 0.09) * 8)
-                # El rival gana: movimiento de risa (rebote hacia arriba)
                 mov_rival_y = -int(abs(math.sin(self.tiempo * 0.012)) * 12)
 
             elif quien_recibio_dano == "empate":
-                # Los dos reciben dano: los dos se sacuden
                 mov_rival_x = int(math.sin(self.tiempo * 0.08) * 8)
                 mov_rival_y = int(math.cos(self.tiempo * 0.09) * 8)
                 mov_jug_x = int(math.sin(self.tiempo * 0.08) * 8)
                 mov_jug_y = int(math.cos(self.tiempo * 0.09) * 8)
 
-        # Rival: arriba a la izquierda
         if emote_rival is not None:
             emote_r = pygame.transform.smoothscale(emote_rival, (tam, tam))
             x_r = MARGEN_X + mov_rival_x
             y_r = MARGEN_Y_BASE + int(offset_flote) + mov_rival_y
             self.ui.blit(emote_r, (x_r, y_r))
 
-        # Jugador: abajo a la derecha
         if emote_jugador is not None:
             emote_j = pygame.transform.smoothscale(emote_jugador, (tam, tam))
             x_j = self.ui.get_width() - tam - MARGEN_X + mov_jug_x

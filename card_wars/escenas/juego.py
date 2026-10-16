@@ -13,6 +13,9 @@ from modelo.juego import Juego
 # --- Carpeta de emotes ---
 CARPETA_EMOTES = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "emotes")
 
+# --- Imagen de la barra de HP ---
+RUTA_HP = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "HP.png")
+
 # --- Definicion de personajes ---
 # Cada personaje tiene 3 archivos: feliz (1), neutro (2), triste (3)
 PERSONAJES = ["Finn", "Arcoiris", "BMO", "Jake"]
@@ -60,6 +63,9 @@ class EscenaJuego(Escena):
         self.rects_jugador = []
         self.rects_enemigo = []
         self.mouse = (0, 0)
+
+        # --- Cargar barra de HP ---
+        self.hp_img = self._cargar(RUTA_HP)
 
         # --- Elegir personajes al azar ---
         self._elegir_personajes()
@@ -246,6 +252,7 @@ class EscenaJuego(Escena):
             emote_jugador=self._emote_jugador(),
             emote_activo=self.tiempo_emote > 0,
             quien_recibio_dano=self.quien_recibio_dano,
+            hp_img=self.hp_img,
         )
 
     def _emote_rival(self):
