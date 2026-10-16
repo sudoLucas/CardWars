@@ -19,6 +19,15 @@ OLA_VELOCIDAD  = 0.006
 
 PAD_ROTACION = 12
 
+# --- Escala de las cartas del rival ---
+ESCALA_CARTA_RIVAL = 0.75
+
+# --- Margen entre el canto y la imagen del reverso ---
+MARGEN_INTERNO_REVERSO = 5
+
+# --- Grosor del canto de las cartas ---
+GROSOR_PX = 2
+
 
 class Render:
     def __init__(self, surface_mundo, surface_ui, fuentes):
@@ -72,9 +81,9 @@ class Render:
         return math.sin(x_m * OLA_FRECUENCIA + self.tiempo * OLA_VELOCIDAD) * OLA_AMPLITUD
 
     # ==================================================
-    # DORSO
+    # DORSO (con 3D y reverso chico dentro del marco)
     # ==================================================
-    def _superficie_dorso(self):
+    def _superficie_dorso(self, reverso_img=None, indice=0):
         w, h = Layout.CARTA_W, Layout.CARTA_H
         w_pad = w + PAD_ROTACION * 2
         h_pad = h + PAD_ROTACION * 2
@@ -82,34 +91,116 @@ class Render:
         surf = pygame.Surface((w_pad, h_pad), pygame.SRCALPHA)
         ox, oy = PAD_ROTACION, PAD_ROTACION
 
-        MARCO_OSCURO = (60, 8, 20)
-        BORDO        = COLOR_DORSO
-        ROMBO_OSCURO = (24, 4, 8)
-        CONTORNO     = AMARILLO
-        GROSOR_MARCO = 2
+        # ================================================
+        # EFECTO 3D
+        # ================================================
+        t = self.tiempo * 0.0015 + indice * 0.6
 
-        pygame.draw.rect(surf, MARCO_OSCURO, (ox, oy, w, h))
-        pygame.draw.rect(surf, BORDO,
-                         (ox + GROSOR_MARCO, oy + GROSOR_MARCO,
-                          w - GROSOR_MARCO * 2, h - GROSOR_MARCO * 2))
+        escala_3d_x = 0.95 + 0.05 * math.sin(t * 1.3)
+        escala_3d_y = 0.97 + 0.03 * math.cos(t * 1.7)
+        inclinacion = math.sin(t * 0.9) * 2
 
-        cx = ox + w // 2
-        cy = oy + h // 2
-        pulso = 1.0 + 0.10 * math.sin(self.tiempo * 0.005)
-        tam_x = int((w // 3) * pulso)
-        tam_y = int((h // 3) * pulso)
+        # Tamano del marco (canto)
+        w_canto = int(w * escala_3d_x * ESCALA_CARTA_RIVAL)
+        h_canto = int(h * escala_3d_y * ESCALA_CARTA_RIVAL)
 
-        pygame.draw.polygon(surf, ROMBO_OSCURO,
-                            [(cx, cy - tam_y), (cx + tam_x, cy),
-                             (cx, cy + tam_y), (cx - tam_x, cy)], 0)
-        pygame.draw.polygon(surf, CONTORNO,
-                            [(cx, cy - tam_y + 1), (cx + tam_x - 1, cy),
-                             (cx, cy + tam_y - 1), (cx - tam_x + 1, cy)], 1)
+        offset_x_canto = (w - w_canto) // 2
+        offset_y_canto = (h - h_canto) // 2
+
+        # ================================================
+        # CANTO (grosor negro, capas detras)
+        # ================================================
+        for offset_grosor in range(GROSOR_PX, 0, -1):
+            canto_color = (15, 10, 15)
+            offset_skew = int(inclinacion * offset_grosor / GROSOR_PX)
+
+            rect_canto = pygame.Rect(
+                ox + offset_x_canto + offset_grosor + offset_skew,
+                oy + offset_y_canto + offset_grosor,
+                w_canto, h_canto
+            )
+            pygame.draw.rect(surf, canto_color, rect_canto)
+
+        # ================================================
+        # REVERSO ACHICADO DENTRO DEL CANTO
+        # ================================================
+        w_reverso = w_canto - MARGEN_INTERNO_REVERSO * 2
+        h_reverso = h_canto - MARGEN_INTERNO_REVERSO * 2
+
+        if w_reverso > 0 and h_reverso > 0:
+            offset_x_reverso = offset_x_canto + MARGEN_INTERNO_REVERSO
+            offset_y_reverso = offset_y_canto + MARGEN_INTERNO_REVERSO
+            offset_skew = int(inclinacion)
+
+            if reverso_img is not None:
+                reverso_escalado = pygame.transform.smoothscale(
+                    reverso_img, (w_reverso, h_reverso)
+                )
+
+                sombreado = pygame.Surface((w_reverso, h_reverso), pygame.SRCALPHA)
+                for y_grad in range(h_reverso):
+                    if y_grad > h_reverso // 2:
+                        alpha = int(40 * ((y_grad - h_reverso // 2) / (h_reverso // 2)))
+                    else:
+                        alpha = 0
+                    pygame.draw.line(
+                        sombreado, (0, 0, 0, alpha),
+                        (0, y_grad), (w_reverso, y_grad)
+                    )
+                reverso_escalado.blit(sombreado, (0, 0))
+
+                surf.blit(reverso_escalado,
+                          (ox + offset_x_reverso + offset_skew,
+                           oy + offset_y_reverso))
+
+            else:
+                MARCO_OSCURO = (60, 8, 20)
+                BORDO        = COLOR_DORSO
+                ROMBO_OSCURO = (24, 4, 8)
+                CONTORNO     = AMARILLO
+                GROSOR_MARCO = 2
+
+                rect_reverso = pygame.Rect(
+                    ox + offset_x_reverso + offset_skew,
+                    oy + offset_y_reverso,
+                    w_reverso, h_reverso
+                )
+                pygame.draw.rect(surf, MARCO_OSCURO, rect_reverso)
+                pygame.draw.rect(surf, BORDO,
+                                 (rect_reverso.x + GROSOR_MARCO,
+                                  rect_reverso.y + GROSOR_MARCO,
+                                  w_reverso - GROSOR_MARCO * 2,
+                                  h_reverso - GROSOR_MARCO * 2))
+
+                cx = rect_reverso.x + w_reverso // 2
+                cy = rect_reverso.y + h_reverso // 2
+                pulso = 1.0 + 0.10 * math.sin(self.tiempo * 0.005)
+                tam_x = int((w_reverso // 3) * pulso)
+                tam_y = int((h_reverso // 3) * pulso)
+
+                pygame.draw.polygon(surf, ROMBO_OSCURO,
+                                    [(cx, cy - tam_y), (cx + tam_x, cy),
+                                     (cx, cy + tam_y), (cx - tam_x, cy)], 0)
+                pygame.draw.polygon(surf, CONTORNO,
+                                    [(cx, cy - tam_y + 1), (cx + tam_x - 1, cy),
+                                     (cx, cy + tam_y - 1), (cx - tam_x + 1, cy)], 1)
+
+        # ================================================
+        # BRILLO SUPERIOR
+        # ================================================
+        offset_skew = int(inclinacion)
+        brillo_color = (120, 100, 130)
+        pygame.draw.line(
+            surf, brillo_color,
+            (ox + offset_x_canto + offset_skew + 2, oy + offset_y_canto + 1),
+            (ox + offset_x_canto + offset_skew + w_canto - 3, oy + offset_y_canto + 1),
+            1
+        )
 
         return surf
 
     # ==================================================
-    # CARTA
+    # CARTA DEL JUGADOR (con 3D, grosor y vida)
     # ==================================================
     def dibujar_carta(self, x_m, y_m, carta, color_fondo,
                       hover=False, resaltada=False, ola=False,
@@ -119,8 +210,28 @@ class Render:
         if ola:
             y_m = y_m + self._offset_ola(x_m)
 
-        x_i = int(round(x_m))
-        y_i = int(round(y_m))
+        # ================================================
+        # EFECTO 3D EN CARTAS DEL JUGADOR
+        # ================================================
+        # Vaiven vertical extra
+        offset_y_flote = math.sin(self.tiempo * 0.003 + x_m * 0.08) * 2
+        y_m += offset_y_flote
+
+        # Compresion horizontal (rotacion eje Y)
+        t = self.tiempo * 0.0015 + x_m * 0.05
+        escala_3d_x = 0.96 + 0.04 * math.sin(t * 1.3)
+
+        # Compresion vertical (rotacion eje X)
+        escala_3d_y = 0.97 + 0.03 * math.cos(t * 1.7)
+
+        # Inclinacion (skew)
+        inclinacion = math.sin(t * 0.9) * 4
+
+        w_3d = int(w * escala_3d_x)
+        h_3d = int(h * escala_3d_y)
+
+        x_i = int(round(x_m + (w - w_3d) / 2))
+        y_i = int(round(y_m + (h - h_3d) / 2))
 
         if not carta.viva:
             color = COLOR_MUERTA
@@ -131,52 +242,106 @@ class Render:
         else:
             color = color_fondo
 
-        rect_m = pygame.Rect(x_i, y_i, w, h)
+        # ================================================
+        # CANTO (grosor falso detras)
+        # ================================================
+        for offset_grosor in range(GROSOR_PX, 0, -1):
+            canto_color = (
+                max(0, color[0] - 60 - offset_grosor * 15),
+                max(0, color[1] - 60 - offset_grosor * 15),
+                max(0, color[2] - 60 - offset_grosor * 15),
+            )
+            offset_skew = int(inclinacion * offset_grosor / GROSOR_PX)
+
+            rect_canto = pygame.Rect(
+                x_i + offset_grosor + offset_skew,
+                y_i + offset_grosor,
+                w_3d, h_3d
+            )
+            pygame.draw.rect(self.mundo, canto_color, rect_canto)
+
+        # ================================================
+        # CUERPO DE LA CARTA
+        # ================================================
+        offset_skew = int(inclinacion)
+        rect_m = pygame.Rect(x_i + offset_skew, y_i, w_3d, h_3d)
         pygame.draw.rect(self.mundo, color, rect_m)
 
+        # Borde
         if destacada:
             pygame.draw.rect(self.mundo, AMARILLO, rect_m, 2)
         else:
             borde = AMARILLO if resaltada else BLANCO
             pygame.draw.rect(self.mundo, borde, rect_m, 1)
 
+        # Brillo superior
+        brillo_color = (
+            min(255, color[0] + 60),
+            min(255, color[1] + 60),
+            min(255, color[2] + 60),
+        )
+        pygame.draw.line(
+            self.mundo, brillo_color,
+            (rect_m.x + 1, rect_m.y + 1),
+            (rect_m.x + w_3d - 2, rect_m.y + 1), 1
+        )
+
+        # Sombra inferior
+        sombra_color = (
+            max(0, color[0] - 50),
+            max(0, color[1] - 50),
+            max(0, color[2] - 50),
+        )
+        pygame.draw.line(
+            self.mundo, sombra_color,
+            (rect_m.x + 1, rect_m.y + h_3d - 2),
+            (rect_m.x + w_3d - 2, rect_m.y + h_3d - 2), 1
+        )
+
+        # ================================================
+        # TEXTO
+        # ================================================
         self._texto_mundo(carta.nombre[:8], self.f["mini"], BLANCO,
-                          x_i + 2, y_i + 2)
+                          rect_m.x + 2, rect_m.y + 2)
 
         poder_txt = str(carta.poder) if carta.viva else "0"
         poder_color = AMARILLO if carta.viva else GRIS_OSCURO
-        cx = x_i + w // 2
+        cx = rect_m.x + w_3d // 2
         self._texto_centrado_mundo(poder_txt, self.f["chica"], poder_color,
-                                   cx, y_i + 12)
+                                   cx, rect_m.y + 12)
         self._texto_centrado_mundo("PODER", self.f["mini"], BLANCO,
-                                   cx, y_i + 26)
+                                   cx, rect_m.y + 26)
 
         if carta.viva:
             max_ag = carta.poder
-            ancho_max = w - 6
+            ancho_max = w_3d - 6
             ancho_actual = int(ancho_max * carta.aguante / max_ag) if max_ag > 0 else 0
-            barra_y = y_i + h - 5
+            barra_y = rect_m.y + h_3d - 5
             pygame.draw.rect(self.mundo, COLOR_FONDO_BARRA,
-                             (x_i + 3, barra_y, ancho_max, 2))
+                             (rect_m.x + 3, barra_y, ancho_max, 2))
             pygame.draw.rect(self.mundo, COLOR_AGUANTE,
-                             (x_i + 3, barra_y, ancho_actual, 2))
+                             (rect_m.x + 3, barra_y, ancho_actual, 2))
 
             txt_ag = f"R {carta.aguante}/{max_ag}"
             surf = self.f["mini"].render(txt_ag, False, COLOR_AGUANTE)
             sombra = self.f["mini"].render(txt_ag, False, NEGRO)
-            x_txt = x_i * self.e + w * self.e - surf.get_width() - 2
-            y_txt = y_i * self.e + h * self.e - surf.get_height() - 6
+            x_txt = rect_m.x * self.e + w_3d * self.e - surf.get_width() - 2
+            y_txt = rect_m.y * self.e + h_3d * self.e - surf.get_height() - 6
             self.ui.blit(sombra, (x_txt + 1, y_txt + 1))
             self.ui.blit(surf, (x_txt, y_txt))
         else:
-            cxm, cym = x_i + w // 2, y_i + h // 2
+            cxm = rect_m.x + w_3d // 2
+            cym = rect_m.y + h_3d // 2
             pygame.draw.line(self.mundo, ROJO, (cxm - 5, cym - 5), (cxm + 5, cym + 5), 1)
             pygame.draw.line(self.mundo, ROJO, (cxm + 5, cym - 5), (cxm - 5, cym + 5), 1)
 
         return rect_m
 
     def dibujar_carta_rotada(self, cx_m, cy_m, surf, angulo):
-        rotada = pygame.transform.rotate(surf, angulo)
+        rotacion_extra = math.sin(self.tiempo * 0.0018 + cx_m * 0.04) * 4
+        angulo_total = angulo + rotacion_extra
+
+        rotada = pygame.transform.rotate(surf, angulo_total)
         rect = rotada.get_rect(center=(cx_m, cy_m))
         self.mundo.blit(rotada, rect)
 
@@ -194,30 +359,78 @@ class Render:
                                    self.f["mini"], BLANCO,
                                    x_m + w_m // 2, y_m + h_m // 2 - 3)
 
-    # ==================================================
-    # MANA
-    # ==================================================
-    def dibujar_mana(self, x_m, y_m, mana, mana_max):
-        w_m = 14
-        h_m = 18
+    def dibujar_barra_hp(self, x, y, hp, hp_max, hp_img, color_lleno):
+        if hp_img is None:
+            return
 
-        pygame.draw.rect(self.mundo, (30, 40, 90),
-                         (x_m, y_m, w_m, h_m))
+        w, h = hp_img.get_size()
 
-        nivel = max(0, min(1, mana / mana_max)) if mana_max > 0 else 0
-        alto_llenado = int((h_m - 4) * nivel)
-        if alto_llenado > 0:
-            pygame.draw.rect(self.mundo, (90, 160, 255),
-                             (x_m + 2, y_m + h_m - 2 - alto_llenado,
-                              w_m - 4, alto_llenado))
+        FACTOR_ANCHO = 1.0
+        FACTOR_ALTO = 0.12
+        SEPARACION = 0
+        MARGEN_IZQ = 150
+        MARGEN_DER = 80
 
-        pygame.draw.rect(self.mundo, BLANCO, (x_m, y_m, w_m, h_m), 1)
-        pygame.draw.rect(self.mundo, (150, 120, 200),
-                         (x_m + 3, y_m - 3, w_m - 6, 3))
+        ancho_util = w - MARGEN_IZQ - MARGEN_DER
+        slot_w = ancho_util // 5
+        slot_h = h
 
-        txt = f"{mana}/{mana_max}"
-        self._texto_centrado_mundo(txt, self.f["mini"], BLANCO,
-                                   x_m + w_m // 2, y_m - 18)
+        ancho_cuadro = int(slot_w * FACTOR_ANCHO)
+        alto_cuadro = int(slot_h * FACTOR_ALTO)
+
+        offset_x_cuadro = (slot_w - ancho_cuadro) // 2
+        offset_y_cuadro = (slot_h - alto_cuadro) // 2
+
+        hp_por_cuadro = hp_max / 5.0 if hp_max > 0 else 0
+        if hp_por_cuadro <= 0:
+            return
+
+        cuadros_llenos = int(hp // hp_por_cuadro)
+        cuadros_llenos = max(0, min(5, cuadros_llenos))
+
+        cuadros_con_hp = math.ceil(hp / hp_por_cuadro)
+        cuadros_con_hp = max(0, min(5, cuadros_con_hp))
+
+        capa = pygame.Surface((w, h), pygame.SRCALPHA)
+
+        for i in range(cuadros_llenos):
+            x_cuadro = (
+                MARGEN_IZQ
+                + i * (slot_w + SEPARACION)
+                + offset_x_cuadro
+            )
+            rect_cuadro = pygame.Rect(
+                x_cuadro, offset_y_cuadro, ancho_cuadro, alto_cuadro
+            )
+            capa.fill(color_lleno, rect_cuadro)
+
+        if cuadros_llenos < cuadros_con_hp:
+            i = cuadros_llenos
+
+            hp_restante = hp - (cuadros_llenos * hp_por_cuadro)
+            fraccion = hp_restante / hp_por_cuadro
+            fraccion = max(0.0, min(1.0, fraccion))
+
+            bordo = (60, 0, 0)
+            r = int(bordo[0] + (color_lleno[0] - bordo[0]) * fraccion)
+            g = int(bordo[1] + (color_lleno[1] - bordo[1]) * fraccion)
+            b = int(bordo[2] + (color_lleno[2] - bordo[2]) * fraccion)
+            color_cuadro = (r, g, b)
+
+            ancho_pintado = int(ancho_cuadro * fraccion)
+            if ancho_pintado > 0:
+                x_cuadro = (
+                    MARGEN_IZQ
+                    + i * (slot_w + SEPARACION)
+                    + offset_x_cuadro
+                )
+                rect_parcial = pygame.Rect(
+                    x_cuadro, offset_y_cuadro, ancho_pintado, alto_cuadro
+                )
+                capa.fill(color_cuadro, rect_parcial)
+
+        capa.blit(hp_img, (0, 0))
+        self.ui.blit(capa, (x, y))
 
     # ==================================================
     # BOTON
@@ -253,22 +466,74 @@ class Render:
     # ESCENA COMPLETA
     # ==================================================
     def dibujar_escena(self, juego, rects_jugador, rects_enemigo, mouse,
-                       btn_reiniciar, btn_siguiente):
+                       btn_reiniciar, btn_siguiente,
+                       emote_rival=None, emote_jugador=None,
+                       emote_activo=False, quien_recibio_dano=None,
+                       hp_img=None, mesa_img=None, reversos_img=None):
         self.mundo.fill(COLOR_FONDO_BARRA)
+
+        # --- Mesa centrada (detras de todo) ---
+        if mesa_img is not None:
+            MESA_ANCHO = 700
+            MESA_ALTO = 500
+            mesa_escalada = pygame.transform.smoothscale(
+                mesa_img, (MESA_ANCHO, MESA_ALTO)
+            )
+            mesa_x = (self.mundo.get_width() - MESA_ANCHO) // 2
+            mesa_y = (self.mundo.get_height() - MESA_ALTO) // 2
+            self.mundo.blit(mesa_escalada, (mesa_x, mesa_y))
 
         ancho_m = self.mundo.get_width()
         alto_m = self.mundo.get_height()
 
-        hp_w = 70
-        hp_h = 8
-        self.dibujar_hp(3, 3, juego.hp_enemigo, juego.hp_enemigo_max,
-                        "RIVAL", (216, 40, 40), hp_w, hp_h)
-        self.dibujar_hp(ancho_m - hp_w - 3, 3,
-                        juego.hp_jugador, juego.hp_jugador_max,
-                        "TU", (0, 144, 248), hp_w, hp_h)
+        # --- HP con HP.png ---
+        if hp_img is not None:
+            ancho_orig, alto_orig = hp_img.get_size()
+            escala_hp = 1
+            ancho_hp = int(ancho_orig * escala_hp)
+            alto_hp = int(alto_orig * escala_hp)
+            hp_img_chica = pygame.transform.smoothscale(
+                hp_img, (ancho_hp, alto_hp)
+            )
 
-        self.dibujar_mana(ancho_m - hp_w - 3 - 24, 20,
-                          juego.mana_jugador, 14)
+            RIVAL_X_BASE = 10
+            RIVAL_Y_BASE = 4
+            JUGADOR_X_MARGEN_DER = 10
+            JUGADOR_Y_BASE = 30
+
+            AMPLITUD_X = 4
+            AMPLITUD_Y = 4
+            VELOCIDAD = 0.003
+
+            t = self.tiempo * VELOCIDAD
+            off_x = int(math.sin(t) * AMPLITUD_X)
+            off_y = int(math.cos(t) * AMPLITUD_Y)
+
+            rival_x = RIVAL_X_BASE + off_x
+            rival_y = RIVAL_Y_BASE + off_y
+            self.dibujar_barra_hp(rival_x, rival_y,
+                                  juego.hp_enemigo, juego.hp_enemigo_max,
+                                  hp_img_chica, (220, 40, 40))
+            self._texto_ui(f"RIVAL: {max(0, juego.hp_enemigo)}",
+                           self.f["mini"], BLANCO,
+                           rival_x, rival_y + alto_hp + 4)
+
+            jugador_x = ANCHO - ancho_hp - JUGADOR_X_MARGEN_DER + off_x
+            jugador_y = JUGADOR_Y_BASE + off_y
+            self.dibujar_barra_hp(jugador_x, jugador_y,
+                                  juego.hp_jugador, juego.hp_jugador_max,
+                                  hp_img_chica, (0, 144, 248))
+            self._texto_ui(f"TU: {max(0, juego.hp_jugador)}",
+                           self.f["mini"], BLANCO,
+                           jugador_x, jugador_y + alto_hp + 4)
+        else:
+            hp_w = 70
+            hp_h = 8
+            self.dibujar_hp(3, 3, juego.hp_enemigo, juego.hp_enemigo_max,
+                            "RIVAL", (216, 40, 40), hp_w, hp_h)
+            self.dibujar_hp(ancho_m - hp_w - 3, 3,
+                            juego.hp_jugador, juego.hp_jugador_max,
+                            "TU", (0, 144, 248), hp_w, hp_h)
 
         # --- Abanico del rival ---
         cantidad_e = len(rects_enemigo)
@@ -287,7 +552,7 @@ class Render:
                            key=lambda i: abs(i - (cantidad_e - 1) / 2.0),
                            reverse=True)
 
-            for i in orden:
+            for pos_visual, i in enumerate(orden):
                 dist_al_centro = abs(i - (cantidad_e - 1) / 2.0)
                 dx = (i - (cantidad_e - 1) / 2.0) * Layout.ABANICO_SEP_X
                 dy = dist_al_centro * Layout.ABANICO_OFFSET_Y
@@ -297,7 +562,12 @@ class Render:
 
                 cy_ola = cy + self._offset_ola(cx)
 
-                surf = self._superficie_dorso()
+                if reversos_img and len(reversos_img) > 0:
+                    reverso_actual = reversos_img[pos_visual % len(reversos_img)]
+                else:
+                    reverso_actual = None
+
+                surf = self._superficie_dorso(reverso_actual, pos_visual)
                 self.dibujar_carta_rotada(cx, cy_ola, surf, angulos[i])
 
         # --- Zona de duelo ---
@@ -347,3 +617,54 @@ class Render:
         elif juego.turno == Turno.RESOLVIENDO:
             self._texto_centrado_mundo("COMBATE", self.f["normal"],
                                        (255, 160, 40), cx_duelo, Layout.Y_MENSAJE)
+
+        # ==================================================
+        # EMOTES
+        # ==================================================
+        TAM_NORMAL = 140
+        TAM_AGRANDADO = 200
+        MARGEN_X = 10
+        MARGEN_Y_BASE = 50
+        FLOTACION_AMPLITUD = 6
+        FLOTACION_VELOCIDAD = 0.002
+
+        tam = TAM_AGRANDADO if emote_activo else TAM_NORMAL
+
+        offset_flote = math.sin(
+            self.tiempo * FLOTACION_VELOCIDAD
+        ) * FLOTACION_AMPLITUD
+
+        mov_rival_x = 0
+        mov_rival_y = 0
+        mov_jug_x = 0
+        mov_jug_y = 0
+
+        if emote_activo:
+            if quien_recibio_dano == "rival":
+                mov_rival_x = int(math.sin(self.tiempo * 0.08) * 8)
+                mov_rival_y = int(math.cos(self.tiempo * 0.09) * 8)
+                mov_jug_y = -int(abs(math.sin(self.tiempo * 0.012)) * 12)
+
+            elif quien_recibio_dano == "jugador":
+                mov_jug_x = int(math.sin(self.tiempo * 0.08) * 8)
+                mov_jug_y = int(math.cos(self.tiempo * 0.09) * 8)
+                mov_rival_y = -int(abs(math.sin(self.tiempo * 0.012)) * 12)
+
+            elif quien_recibio_dano == "empate":
+                mov_rival_x = int(math.sin(self.tiempo * 0.08) * 8)
+                mov_rival_y = int(math.cos(self.tiempo * 0.09) * 8)
+                mov_jug_x = int(math.sin(self.tiempo * 0.08) * 8)
+                mov_jug_y = int(math.cos(self.tiempo * 0.09) * 8)
+
+        if emote_rival is not None:
+            emote_r = pygame.transform.smoothscale(emote_rival, (tam, tam))
+            x_r = MARGEN_X + mov_rival_x
+            y_r = MARGEN_Y_BASE + int(offset_flote) + mov_rival_y
+            self.ui.blit(emote_r, (x_r, y_r))
+
+        if emote_jugador is not None:
+            emote_j = pygame.transform.smoothscale(emote_jugador, (tam, tam))
+            x_j = self.ui.get_width() - tam - MARGEN_X + mov_jug_x
+            y_j = (self.ui.get_height() - tam - MARGEN_Y_BASE
+                   + int(offset_flote) + mov_jug_y)
+            self.ui.blit(emote_j, (x_j, y_j))
