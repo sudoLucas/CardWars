@@ -3,12 +3,18 @@
 Configuracion global del juego.
 
 SISTEMA DE COORDENADAS:
-- El "mundo" mide ANCHO/ESCALA_PIXEL x ALTO/ESCALA_PIXEL (por defecto 300x200).
+- El "mundo" mide RESOLUCION_INTERNA_W/ESCALA_PIXEL x RESOLUCION_INTERNA_H/ESCALA_PIXEL.
 - Todas las constantes de Layout y Botones estan en unidades del MUNDO.
 - El render las dibuja tal cual sobre surface_mundo.
 - Los textos van al surface_ui en pixeles reales.
+
+SISTEMA DE VENTANA:
+- RESOLUCION_INTERNA es la resolucion del juego (nunca cambia).
+- VENTANA_W/H es el tamano de la ventana al abrir.
+- Pygame escala la resolucion interna a la ventana con SCALED.
 """
 
+import os
 from dataclasses import dataclass
 import pygame
 
@@ -16,36 +22,53 @@ import pygame
 # ============================================================
 # METADATA
 # ============================================================
-TITULO  = "Card Wars MVP"
+TITULO  = "Card Wars"
 VERSION = "0.3.0"
 AUTOR   = ""
 
 
 # ============================================================
+# RUTAS (absolutas, relativas a este archivo)
+# ============================================================
+DIRECTORIO_RAIZ = os.path.dirname(os.path.abspath(__file__))
+
+
+# ============================================================
 # VENTANA / RENDER
 # ============================================================
-ANCHO_DESEADO, ALTO_DESEADO = 1200, 800
-ANCHO, ALTO = ANCHO_DESEADO, ALTO_DESEADO
+# --- Resolucion interna del juego (NUNCA cambia) ---
+# Todo el gameplay, textos, etc. se dibujan a esta resolucion.
+RESOLUCION_INTERNA_W, RESOLUCION_INTERNA_H = 1200, 800
+
+# --- Tamano de la VENTANA al abrir ---
+# Pygame escala la resolucion interna a este tamano automaticamente.
+# MANTENER la proporcion 3:2 para que no se estire (ej: 900x600, 750x500).
+VENTANA_W, VENTANA_H = 900, 600
+
+# Compatibilidad: ANCHO/ALTO siguen siendo la resolucion interna.
+ANCHO, ALTO = RESOLUCION_INTERNA_W, RESOLUCION_INTERNA_H
 
 FPS = 60
-RUTA_FUENTE = "assets/fuentes/pixel.ttf"
 
+# Ruta absoluta a la fuente pixel art
+RUTA_FUENTE = os.path.join(DIRECTORIO_RAIZ, "assets", "fuentes", "pixel.ttf")
+
+# Escala pixel art: cada unidad del mundo = ESCALA_PIXEL pixeles reales
 ESCALA_PIXEL = 4
 
 
 def inicializar_ventana():
-    global ANCHO, ALTO
+    """
+    Devuelve (ancho_ventana, alto_ventana) para crear la ventana.
+    La resolucion INTERNA sigue siendo RESOLUCION_INTERNA_W x RESOLUCION_INTERNA_H.
+    Si la ventana pedida no entra en el monitor, la achica.
+    """
     info = pygame.display.Info()
-    ancho_pantalla = info.current_w
-    alto_pantalla = info.current_h
-    ancho_max = int(ancho_pantalla * 0.90)
-    alto_max = int(alto_pantalla * 0.90)
-    ancho = min(ANCHO_DESEADO, ancho_max)
-    alto = min(ALTO_DESEADO, alto_max)
-    ancho = (ancho // ESCALA_PIXEL) * ESCALA_PIXEL
-    alto = (alto // ESCALA_PIXEL) * ESCALA_PIXEL
-    ANCHO, ALTO = ancho, alto
-    return ancho, alto
+
+    ancho_ventana = min(VENTANA_W, int(info.current_w * 0.90))
+    alto_ventana = min(VENTANA_H, int(info.current_h * 0.90))
+
+    return ancho_ventana, alto_ventana
 
 
 # ============================================================
@@ -69,20 +92,25 @@ class Escena:
 # LAYOUT (en unidades del MUNDO)
 # ============================================================
 class Layout:
+    # Cartas
     CARTA_W, CARTA_H = 55, 68
     ESPACIO_CARTAS   = 14
 
+    # --- Abanico del rival ---
     Y_CENTRO_RIVAL = 28
     ABANICO_SEP_X = 38
     ABANICO_OFFSET_Y = 12
     ABANICO_ANGULO = 8
 
+    # --- Zona de duelo ---
     Y_CENTRO_DUELO = 100
     Y_VS = 78
     DUELO_SEP_Y = 4
 
+    # --- Mano del jugador ---
     Y_TOP_MANO = 148
 
+    # --- Mensajes de estado ---
     Y_MENSAJE = 138
 
     @classmethod
@@ -95,29 +123,26 @@ class Layout:
 # BOTONES (en unidades del MUNDO)
 # ============================================================
 class Botones:
+    # REINICIAR (abajo a la izquierda, no pisa cartas)
     REINICIAR_W, REINICIAR_H = 60, 12
     REINICIAR_X = 8
     REINICIAR_Y = 185
 
+    # SIGUIENTE RONDA (abajo a la derecha)
     SIGUIENTE_W, SIGUIENTE_H = 70, 12
     SIGUIENTE_X = 300 - 78
     SIGUIENTE_Y = 185
 
-    MENU_W, MENU_H = 140, 22
-    MENU_ESPACIO_Y = 30
-    MENU_Y_INICIAL = 85
+    # MENU (esquina inferior izquierda, juntos)
+    MENU_W, MENU_H = 80, 8
+    MENU_ESPACIO_Y = 3       # padding vertical entre botones
+    MENU_X_MARGEN = 12       # margen desde el borde izquierdo
+    MENU_Y_MARGEN = 12       # margen desde el borde inferior
+    MENU_BORDE_GROSOR = 1    # grosor del borde del contenedor (en unidades del mundo)
 
-    DIFICULTAD_W, DIFICULTAD_H = 90, 14
-    DIFICULTAD_ESPACIO_Y       = 35
-
-
-# ============================================================
-# MANA
-# ============================================================
-MANA_INICIAL  = 7
-MANA_MAXIMO   = 14
-MANA_SUMA_MIN = 1
-MANA_SUMA_MAX = 2
+    # DIFICULTAD
+    DIFICULTAD_W, DIFICULTAD_H = 80, 8
+    DIFICULTAD_ESPACIO_Y       = 3
 
 
 # ============================================================
@@ -139,7 +164,7 @@ DIFICULTAD_FACIL = ConfigDificultad(
     hp_enemigo    = 150,
     tamano_mazo   = 3,
     estrategia_ia = "IARandom",
-    descripcion   = "La IA juega al azar.",
+    descripcion   = "",
 )
 
 DIFICULTAD_NORMAL = ConfigDificultad(
@@ -148,7 +173,7 @@ DIFICULTAD_NORMAL = ConfigDificultad(
     hp_enemigo    = 250,
     tamano_mazo   = 3,
     estrategia_ia = "IAConservadora",
-    descripcion   = "La IA guarda sus cartas fuertes.",
+    descripcion   = "",
 )
 
 DIFICULTAD_DURO = ConfigDificultad(
@@ -157,7 +182,7 @@ DIFICULTAD_DURO = ConfigDificultad(
     hp_enemigo    = 300,
     tamano_mazo   = 4,
     estrategia_ia = "IAAdaptativa",
-    descripcion   = "La IA reacciona a lo que jugas.",
+    descripcion   = "",
 )
 
 DIFICULTADES = {
@@ -174,25 +199,6 @@ DIFICULTAD_DEFAULT = "normal"
 # ============================================================
 DUELO_DURACION = 1500
 
-POOL_CARTAS = [
-    ("Gato",    5),
-    ("Slime",   5),
-    ("Perro",  10),
-    ("Lobo",   10),
-    ("Dragon", 15),
-    ("Tigre",  15),
-    ("Fenix",  20),
-    ("Titan",  20),
-    ("Golem",  25),
-    ("Vampiro", 25),
-]
-
-
-# ============================================================
-# HELPERS
-# ============================================================
-def get_dificultad(clave):
-    return DIFICULTADES.get(clave, DIFICULTADES[DIFICULTAD_DEFAULT])
 POOL_CARTAS = [
     ("Gato",    5),
     ("Slime",   5),
