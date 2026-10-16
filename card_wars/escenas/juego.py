@@ -16,6 +16,14 @@ CARPETA_EMOTES = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "emotes")
 # --- Imagen de la barra de HP ---
 RUTA_HP = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "HP.png")
 
+# --- Imagen de la mesa ---
+RUTA_MESA = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "mesa.png")
+
+# --- Carpeta de reversos de carta ---
+CARPETA_REVERSOS = os.path.join(
+    DIRECTORIO_RAIZ, "assets", "imagenes", "Objetos", "cartas"
+)
+
 # --- Definicion de personajes ---
 # Cada personaje tiene 3 archivos: feliz (1), neutro (2), triste (3)
 PERSONAJES = ["Finn", "Arcoiris", "BMO", "Jake"]
@@ -31,7 +39,7 @@ def rutas_personaje(nombre):
 
 
 # --- Duracion del emote de dano (ms) ---
-EMOTE_DURACION = 1500
+EMOTE_DURACION = 2500
 
 
 class EscenaJuego(Escena):
@@ -67,11 +75,17 @@ class EscenaJuego(Escena):
         # --- Cargar barra de HP ---
         self.hp_img = self._cargar(RUTA_HP)
 
+        # --- Cargar mesa ---
+        self.mesa_img = self._cargar(RUTA_MESA)
+
         # --- Elegir personajes al azar ---
         self._elegir_personajes()
 
         # --- Cargar emotes segun los personajes elegidos ---
         self._cargar_emotes()
+
+        # --- Elegir 3 reversos random (no repetidos) ---
+        self._elegir_reversos()
 
         # Estado actual: "neutro", "feliz" o "triste"
         self.emote_rival_actual = "neutro"
@@ -105,6 +119,16 @@ class EscenaJuego(Escena):
         self.emote_rival_feliz  = self._cargar(rutas_r["feliz"])
         self.emote_rival_triste = self._cargar(rutas_r["triste"])
 
+    def _elegir_reversos(self):
+        """Elige 3 reversos random distintos entre los 6 disponibles."""
+        numeros = random.sample(range(1, 7), 3)
+        self.reversos_img = []
+        for n in numeros:
+            ruta = os.path.join(CARPETA_REVERSOS, f"reversoCarta{n}.png")
+            img = self._cargar(ruta)
+            if img is not None:
+                self.reversos_img.append(img)
+
     def _cargar(self, ruta):
         if os.path.isfile(ruta):
             try:
@@ -122,6 +146,9 @@ class EscenaJuego(Escena):
         # Nuevos personajes random
         self._elegir_personajes()
         self._cargar_emotes()
+
+        # Nuevos reversos random
+        self._elegir_reversos()
 
         self.hp_jugador_anterior = self.juego.hp_jugador
         self.hp_enemigo_anterior = self.juego.hp_enemigo
@@ -253,6 +280,8 @@ class EscenaJuego(Escena):
             emote_activo=self.tiempo_emote > 0,
             quien_recibio_dano=self.quien_recibio_dano,
             hp_img=self.hp_img,
+            mesa_img=self.mesa_img,
+            reversos_img=self.reversos_img,
         )
 
     def _emote_rival(self):
