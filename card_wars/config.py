@@ -141,8 +141,8 @@ class Botones:
     MENU_BORDE_GROSOR = 1    # grosor del borde del contenedor (en unidades del mundo)
 
     # DIFICULTAD
-    DIFICULTAD_W, DIFICULTAD_H = 80, 8
-    DIFICULTAD_ESPACIO_Y       = 3
+    DIFICULTAD_W, DIFICULTAD_H = 90, 14
+    DIFICULTAD_ESPACIO_Y       = 35
 
 
 # ============================================================
