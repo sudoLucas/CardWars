@@ -1,5 +1,9 @@
 # modelo/juego.py
-from config import Turno
+import random
+from config import (
+    Turno,
+    MANA_INICIAL, MANA_MAXIMO, MANA_SUMA_MIN, MANA_SUMA_MAX,
+)
 from modelo.mazo import Mazo
 from modelo.ia import crear_estrategia
 
@@ -18,11 +22,31 @@ class Juego:
         self.hp_enemigo = self.dificultad.hp_enemigo
         self.hp_jugador_max = self.dificultad.hp_jugador
         self.hp_enemigo_max = self.dificultad.hp_enemigo
+        self.mana_jugador = MANA_INICIAL
+        self.mana_enemigo = MANA_INICIAL
         self.turno = Turno.JUGADOR
         self.ronda = 1
         self.mensaje = "zz Round one: elegi una carta pa' bajar"
         self.carta_jugada_jugador = None
         self.carta_jugada_enemigo = None
+
+    # ---------- Mana ----------
+    def sumar_mana(self):
+        suma_j = random.randint(MANA_SUMA_MIN, MANA_SUMA_MAX)
+        suma_e = random.randint(MANA_SUMA_MIN, MANA_SUMA_MAX)
+        self.mana_jugador = min(MANA_MAXIMO, self.mana_jugador + suma_j)
+        self.mana_enemigo = min(MANA_MAXIMO, self.mana_enemigo + suma_e)
+
+    def puede_pagar(self, jugador, costo):
+        if jugador == "jugador":
+            return self.mana_jugador >= costo
+        return self.mana_enemigo >= costo
+
+    def gastar_mana(self, jugador, costo):
+        if jugador == "jugador":
+            self.mana_jugador = max(0, self.mana_jugador - costo)
+        else:
+            self.mana_enemigo = max(0, self.mana_enemigo - costo)
 
     # ---------- Turno del jugador ----------
     def jugador_tira_carta(self, idx):
@@ -36,11 +60,9 @@ class Juego:
             self.mensaje = "zz Carta descartada, pa"
             return
 
-        # Asegurar que el rival tenga carta
         if not self.mazo_enemigo.hay_vivas():
             self.mazo_enemigo.rebarajar_si_hace_falta(self.hp_enemigo)
 
-        # La IA decide
         carta_e, idx_e = self.estrategia.elegir(
             self.mazo_enemigo, self.mazo_jugador,
             self.hp_enemigo, self.hp_jugador,
@@ -86,6 +108,8 @@ class Juego:
 
         self.mazo_jugador.rebarajar_si_hace_falta(self.hp_jugador)
         self.mazo_enemigo.rebarajar_si_hace_falta(self.hp_enemigo)
+
+        self.sumar_mana()
 
         self.turno = Turno.JUGADOR
         self.mensaje = f"zz Round {self.ronda}: elegi una carta para bajar"
