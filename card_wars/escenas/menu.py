@@ -32,7 +32,7 @@ RUTA_COLINA_FONDO  = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina
 # --- Capa FONDO (colina3, la mas lejana) ---
 FONDO_ZOOM        = 1.25
 FONDO_VELOCIDAD   = 0.0001
-FONDO_OFFSET_X    = 50
+FONDO_OFFSET_X    = 0
 FONDO_OFFSET_Y    = 0
 
 # --- Capa MEDIO (colina2) ---
@@ -43,7 +43,7 @@ MEDIO_OFFSET_Y    = -100
 
 # --- Capa FRENTE (colina1, la mas cercana) ---
 FRENTE_ZOOM       = 1.5
-FRENTE_VELOCIDAD  = 0.0005
+FRENTE_VELOCIDAD  = 0.00009
 FRENTE_OFFSET_X   = 0
 FRENTE_OFFSET_Y   = -320
 
@@ -127,8 +127,9 @@ class EscenaMenu(Escena):
 
     def _accion(self, clave):
         if clave == "jugar":
-            from escenas.juego import EscenaJuego
-            self.app.cambiar_escena(EscenaJuego(self.app))
+            # Va a la pantalla de seleccion de niveles
+            from escenas.niveles import EscenaNiveles
+            self.app.cambiar_escena(EscenaNiveles(self.app))
         elif clave == "dificultad":
             self.app.cambiar_escena(EscenaDificultad(self.app))
         elif clave == "salir":
@@ -202,14 +203,8 @@ class EscenaMenu(Escena):
             TITULO, self.fuentes["grande"], AMARILLO,
             x_texto, 14
         )
-        self.render._texto_mundo(
-            f"v{VERSION}", self.fuentes["chica"], GRIS,
-            x_texto, 34
-        )
-        self.render._texto_mundo(
-            "Elegi una opcion", self.fuentes["normal"], BLANCO,
-            x_texto, 58
-        )
+
+
 
         for i, (clave, texto, rect) in enumerate(self.botones):
             seleccionado = (i == self.indice)
@@ -245,10 +240,6 @@ class EscenaMenu(Escena):
                         (x_sub, y_sub, ancho_actual, 3)
                     )
 
-        self.render._texto_centrado_mundo(
-            "ESC para salir", self.fuentes["chica"], GRIS,
-            ancho_m - 40, alto_m - 14
-        )
 
     def update(self, dt):
         self.app.tiempo_fondo += dt

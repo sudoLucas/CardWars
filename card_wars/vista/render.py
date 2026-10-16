@@ -199,12 +199,6 @@ class Render:
     # ==================================================
     def dibujar_boton(self, rect, texto, hover, color_on, color_off,
                       borde_color=None, borde_grosor=2):
-        """
-        Dibuja un boton en el mundo con un borde de color alrededor.
-        - rect: pygame.Rect en pantalla real (se divide por escala)
-        - borde_color: color del borde (None = usa el default segun hover)
-        - borde_grosor: grosor del borde en unidades del MUNDO
-        """
         x_m = rect[0] // self.e
         y_m = rect[1] // self.e
         w_m = rect[2] // self.e
@@ -212,15 +206,12 @@ class Render:
 
         color_base = color_on if hover else color_off
 
-        # Elegir color del borde si no viene uno custom
         if borde_color is None:
             borde_color = COLOR_BORDE_BOTON_HOVER if hover else COLOR_BORDE_BOTON
 
-        # Fondo del boton
         rect_m = pygame.Rect(x_m, y_m, w_m, h_m)
         pygame.draw.rect(self.mundo, color_base, rect_m)
 
-        # Borde del contenedor (dibujado por dentro)
         if borde_grosor > 0:
             for i in range(borde_grosor):
                 borde_rect = pygame.Rect(
@@ -229,16 +220,17 @@ class Render:
                 )
                 pygame.draw.rect(self.mundo, borde_color, borde_rect, 1)
 
-        # Texto centrado
         self._texto_centrado_mundo(texto, self.f["mini"], BLANCO,
                                    x_m + w_m // 2, y_m + h_m // 2 - 4)
         return rect
 
-    # ==================================================
-    # ESCENA COMPLETA
-    # ==================================================
+# ==================================================
+# ESCENA COMPLETA
+# ==================================================
     def dibujar_escena(self, juego, rects_jugador, rects_enemigo, mouse,
-                       btn_reiniciar, btn_siguiente):
+                       btn_reiniciar, btn_siguiente,
+                       emote_rival=None, emote_jugador=None,
+                       emote_activo=False, quien_recibio_dano=None):
         self.mundo.fill(COLOR_FONDO_BARRA)
 
         ancho_m = self.mundo.get_width()
@@ -329,3 +321,63 @@ class Render:
         elif juego.turno == Turno.RESOLVIENDO:
             self._texto_centrado_mundo("COMBATE", self.f["normal"],
                                        (255, 160, 40), cx_duelo, Layout.Y_MENSAJE)
+
+        # ==================================================
+        # EMOTES (mas grandes, con flotacion, sacudida y risa)
+        # ==================================================
+        TAM_NORMAL = 140
+        TAM_AGRANDADO = 200
+        MARGEN_X = 10
+        MARGEN_Y_BASE = 50
+        FLOTACION_AMPLITUD = 6
+        FLOTACION_VELOCIDAD = 0.002
+
+        tam = TAM_AGRANDADO if emote_activo else TAM_NORMAL
+
+        # Flotacion base (siempre activa, para los dos)
+        offset_flote = math.sin(
+            self.tiempo * FLOTACION_VELOCIDAD
+        ) * FLOTACION_AMPLITUD
+
+        # Movimiento extra segun quien recibio dano
+        mov_rival_x = 0
+        mov_rival_y = 0
+        mov_jug_x = 0
+        mov_jug_y = 0
+
+        if emote_activo:
+            if quien_recibio_dano == "rival":
+                # El rival recibe dano: se sacude (impact frame)
+                mov_rival_x = int(math.sin(self.tiempo * 0.08) * 8)
+                mov_rival_y = int(math.cos(self.tiempo * 0.09) * 8)
+                # El jugador gana: movimiento de risa (rebote hacia arriba)
+                mov_jug_y = -int(abs(math.sin(self.tiempo * 0.012)) * 12)
+
+            elif quien_recibio_dano == "jugador":
+                # El jugador recibe dano: se sacude (impact frame)
+                mov_jug_x = int(math.sin(self.tiempo * 0.08) * 8)
+                mov_jug_y = int(math.cos(self.tiempo * 0.09) * 8)
+                # El rival gana: movimiento de risa (rebote hacia arriba)
+                mov_rival_y = -int(abs(math.sin(self.tiempo * 0.012)) * 12)
+
+            elif quien_recibio_dano == "empate":
+                # Los dos reciben dano: los dos se sacuden
+                mov_rival_x = int(math.sin(self.tiempo * 0.08) * 8)
+                mov_rival_y = int(math.cos(self.tiempo * 0.09) * 8)
+                mov_jug_x = int(math.sin(self.tiempo * 0.08) * 8)
+                mov_jug_y = int(math.cos(self.tiempo * 0.09) * 8)
+
+        # Rival: arriba a la izquierda
+        if emote_rival is not None:
+            emote_r = pygame.transform.smoothscale(emote_rival, (tam, tam))
+            x_r = MARGEN_X + mov_rival_x
+            y_r = MARGEN_Y_BASE + int(offset_flote) + mov_rival_y
+            self.ui.blit(emote_r, (x_r, y_r))
+
+        # Jugador: abajo a la derecha
+        if emote_jugador is not None:
+            emote_j = pygame.transform.smoothscale(emote_jugador, (tam, tam))
+            x_j = self.ui.get_width() - tam - MARGEN_X + mov_jug_x
+            y_j = (self.ui.get_height() - tam - MARGEN_Y_BASE
+                   + int(offset_flote) + mov_jug_y)
+            self.ui.blit(emote_j, (x_j, y_j))

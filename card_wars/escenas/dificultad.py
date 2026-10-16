@@ -19,21 +19,21 @@ RUTA_COLINA_MEDIO  = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina
 RUTA_COLINA_FONDO  = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina3.png")
 
 
-# ============================================================
-# AJUSTES DE LAS COLINAS (IDENTICOS a menu.py)
-# ============================================================
+# --- Capa FONDO (colina3, la mas lejana) ---
 FONDO_ZOOM        = 1.25
 FONDO_VELOCIDAD   = 0.0001
-FONDO_OFFSET_X    = 50
+FONDO_OFFSET_X    = 0
 FONDO_OFFSET_Y    = 0
 
+# --- Capa MEDIO (colina2) ---
 MEDIO_ZOOM        = 1.25
 MEDIO_VELOCIDAD   = 0.0002
 MEDIO_OFFSET_X    = 25
 MEDIO_OFFSET_Y    = -100
 
+# --- Capa FRENTE (colina1, la mas cercana) ---
 FRENTE_ZOOM       = 1.5
-FRENTE_VELOCIDAD  = 0.0005
+FRENTE_VELOCIDAD  = 0.00009
 FRENTE_OFFSET_X   = 0
 FRENTE_OFFSET_Y   = -320
 
@@ -71,10 +71,6 @@ class EscenaDificultad(Escena):
             cfg = DIFICULTADES[claves[i]]
             self.botones.append((claves[i], cfg.nombre, rect))
 
-        # --- Boton VOLVER, arriba de todo ---
-        y_volver = y_ultimo - n * (h + sep)
-        rect_volver = pygame.Rect(margen_x, y_volver, w, h)
-        self.botones.insert(0, ("volver", "VOLVER", rect_volver))
 
         self.hover = None
         self.indice = 0
@@ -247,10 +243,6 @@ class EscenaDificultad(Escena):
                         (x_sub, y_sub, ancho_actual, 3)
                     )
 
-        self.render._texto_centrado_mundo(
-            "ESC para volver", self.fuentes["chica"], GRIS,
-            ancho_m - 40, alto_m - 14
-        )
 
     def update(self, dt):
         # ESTA es la linea que faltaba: incrementa el tiempo compartido
