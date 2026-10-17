@@ -15,6 +15,13 @@ class EscenaFin(Escena):
         self.juego = juego
         self.gano = juego.hp_enemigo <= 0
 
+        # Si ganó, desbloqueamos el siguiente nivel
+        if self.gano and app.nivel_actual is not None:
+            app.desbloquear_siguiente_nivel(
+                app.clave_dificultad,
+                app.nivel_actual,
+            )
+
         cx = ANCHO // 2
         y = 380
         w = Botones.MENU_W
@@ -28,7 +35,6 @@ class EscenaFin(Escena):
         self.hover = None
 
     def handle_event(self, evento, mouse):
-        # hover
         self.hover = None
         for clave, _, rect in self.botones:
             if rect.collidepoint(mouse):

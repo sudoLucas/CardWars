@@ -58,30 +58,33 @@ class Juego:
         if self.turno != Turno.IA_TIRA:
             return
 
-        # Si no hay criaturas vivas, rebarajar
-        self.mazo_enemigo.rebarajar_si_hace_falta(self.hp_enemigo)
-
+        # Intentar elegir una carta
         carta_e, idx_e = self.estrategia.elegir(
             self.mazo_enemigo, self.mazo_jugador,
             self.hp_enemigo, self.hp_jugador,
         )
 
+        # Si no puede tirar, verificar por que
         if carta_e is None:
-            # Fallback: si por algún motivo no hay criaturas,
-            # rebarajar y volver a intentar una vez.
-            self.mazo_enemigo.barajar()
-            carta_e, idx_e = self.estrategia.elegir(
-                self.mazo_enemigo, self.mazo_jugador,
-                self.hp_enemigo, self.hp_jugador,
-            )
-            if carta_e is None:
-                self.chequear_fin()
-                return
+            # Forzar rebaraje si solo tiene hechizos o esta vacio
+            if not self.mazo_enemigo.hay_vivas() or not self.mazo_enemigo.tiene_criaturas_vivas():
+                self.mazo_enemigo.barajar()
+                
+                # Volver a intentar elegir con las cartas nuevas
+                carta_e, idx_e = self.estrategia.elegir(
+                    self.mazo_enemigo, self.mazo_jugador,
+                    self.hp_enemigo, self.hp_jugador,
+                )
+
+        # Si sigue sin poder tirar, terminar
+        if carta_e is None:
+            self.chequear_fin()
+            return
 
         self.carta_jugada_enemigo = idx_e
         self.turno = Turno.JUGADOR_TIRA
         self.mensaje = "zz Tu turno: elegi una criatura para bajar"
-
+        
     # ---------- Fase: jugador tira ----------
     def jugador_tira_carta(self, idx):
         if self.turno != Turno.JUGADOR_TIRA:
@@ -224,8 +227,31 @@ class Juego:
         if self.carta_jugada_jugador is None or self.carta_jugada_enemigo is None:
             return False
 
+        # Validar que los indices sigan siendo validos
+        if (self.carta_jugada_jugador >= len(self.mazo_jugador.cartas)
+                or self.carta_jugada_enemigo >= len(self.mazo_enemigo.cartas)):
+            # Algun indice quedo fuera de rango (pasa si un hechizo
+            # elimino la criatura rival y se reacomodo el mazo)
+            self.chequear_fin()
+            return False
+
         carta_j = self.mazo_jugador[self.carta_jugada_jugador]
         carta_e = self.mazo_enemigo[self.carta_jugada_enemigo]
+
+        # Si la criatura rival ya murio (por Rayo/Drenaje), no hay duelo
+        if not carta_e.viva:
+            self.mensaje = "zz La criatura rival ya fue derrotada"
+            self.turno = Turno.RESULTADO
+            self.chequear_fin()
+            return True
+
+        # Si la criatura del jugador ya murio (por algun buff raro),
+        # tampoco hay duelo
+        if not carta_j.viva:
+            self.mensaje = "zz Tu criatura ya no esta en la mesa"
+            self.turno = Turno.RESULTADO
+            self.chequear_fin()
+            return True
 
         self._ia_usar_hechizos()
 

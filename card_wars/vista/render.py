@@ -193,7 +193,8 @@ class Render:
     # ==================================================
     # CARTA DEL JUGADOR EN EL ABANICO
     # ==================================================
-    def _dibujar_carta_abanico(self, cx_m, cy_m, carta, angulo, hover=False):
+    def _dibujar_carta_abanico(self, cx_m, cy_m, carta, angulo, hover=False,
+                               seleccionada=False):
         w, h = Layout.CARTA_W, Layout.CARTA_H
         factor = 2
 
@@ -214,7 +215,7 @@ class Render:
 
         if not carta.viva:
             color = COLOR_MUERTA
-        elif hover:
+        elif hover or seleccionada:
             color = COLOR_JUGADOR_HOVER
         else:
             color = COLOR_JUGADOR
@@ -228,6 +229,11 @@ class Render:
             pygame.draw.rect(surf, COLOR_HECHIZO_BRILLO, rect, 2)
         else:
             pygame.draw.rect(surf, BLANCO, rect, 1)
+
+        if seleccionada:
+            intensidad = 0.5 + 0.5 * math.sin(self.tiempo * 0.01)
+            color_sel = (int(255 * intensidad), int(200 + 55 * intensidad), 0)
+            pygame.draw.rect(surf, color_sel, rect, 3)
 
         brillo = (
             min(255, color[0] + 60),
@@ -246,9 +252,9 @@ class Render:
                          (ox + 1, oy + h_draw - 2),
                          (ox + w_draw - 2, oy + h_draw - 2), 1)
 
-        if hover:
-            def _blit_texto_escalado(superficie, texto, fuente, color, x, y):
-                txt = fuente.render(texto, False, color)
+        if hover or seleccionada:
+            def _blit_texto_escalado(superficie, texto, fuente, color_txt, x, y):
+                txt = fuente.render(texto, False, color_txt)
                 tam = (
                     max(1, txt.get_width() // factor),
                     max(1, txt.get_height() // factor),
@@ -649,17 +655,23 @@ class Render:
                        emote_rival=None, emote_jugador=None,
                        emote_activo=False, quien_recibio_dano=None,
                        hp_img=None, mesa_img=None, reversos_img=None,
-                       posiciones_jugador=None):
+                       posiciones_jugador=None,
+                       hechizo_seleccionado=None,
+                       rects_cartas_rival_clickeables=None,
+                       mensaje_hechizo=None,
+                       carta_vision_idx=None,
+                       vision_activa_hasta=0):
         self.mundo.fill(COLOR_FONDO_BARRA)
 
         if mesa_img is not None:
-            MESA_ANCHO = 700
-            MESA_ALTO = 500
+            MESA_ANCHO = 300
+            MESA_ALTO = 210
             mesa_escalada = pygame.transform.smoothscale(
                 mesa_img, (MESA_ANCHO, MESA_ALTO)
             )
             mesa_x = (self.mundo.get_width() - MESA_ANCHO) // 2
-            mesa_y = (self.mundo.get_height() - MESA_ALTO) // 2
+            # Bajamos la mesa: le restamos MENOS
+            mesa_y = Layout.Y_CENTRO_DUELO - (MESA_ALTO // 2)
             self.mundo.blit(mesa_escalada, (mesa_x, mesa_y))
 
         ancho_m = self.mundo.get_width()
@@ -712,10 +724,19 @@ class Render:
         mana_disponible = getattr(juego, "mana_jugador", 0)
         self.dibujar_mana(ancho_m - 40, alto_m - 75, mana_disponible, 14)
 
+        # --- Vision activa? ---
+        ahora_ms = pygame.time.get_ticks()
+        vision_activa = (vision_activa_hasta > ahora_ms
+                         and carta_vision_idx is not None)
+
         # --- Abanico del rival ---
         cantidad_e = len(rects_enemigo)
         cx_centro = ancho_m // 2
         cy_centro = Layout.Y_CENTRO_RIVAL
+
+        esperando_target = hechizo_seleccionado is not None
+        intensidad = 0.5 + 0.5 * math.sin(self.tiempo * 0.01)
+        color_resaltado = (int(255 * intensidad), int(200 + 55 * intensidad), 0)
 
         if cantidad_e > 0:
             if cantidad_e > 1:
@@ -739,15 +760,33 @@ class Render:
 
                 cy_ola = cy + self._offset_ola(cx)
 
-                if reversos_img and len(reversos_img) > 0:
-                    reverso_actual = reversos_img[pos_visual % len(reversos_img)]
+                mostrar_vision = vision_activa and pos_visual == carta_vision_idx
+
+                if mostrar_vision and reversos_img is not None:
+                    idx_real = rects_enemigo[i][0]
+                    carta_rival = juego.mazo_enemigo.cartas[idx_real]
+                    self.dibujar_carta(cx - Layout.CARTA_W // 2,
+                                       cy_ola - Layout.CARTA_H // 2,
+                                       carta_rival, COLOR_ENEMIGO,
+                                       destacada=True)
                 else:
-                    reverso_actual = None
+                    if reversos_img and len(reversos_img) > 0:
+                        reverso_actual = reversos_img[pos_visual % len(reversos_img)]
+                    else:
+                        reverso_actual = None
 
-                surf = self._superficie_dorso(reverso_actual, pos_visual)
-                self.dibujar_carta_rotada(cx, cy_ola, surf, angulos[i])
+                    surf = self._superficie_dorso(reverso_actual, pos_visual)
+                    self.dibujar_carta_rotada(cx, cy_ola, surf, angulos[i])
 
-        # --- Mano del jugador (antes del duelo para que las cartas del duelo queden encima) ---
+                    if esperando_target and rects_cartas_rival_clickeables:
+                        for idx_slot, rect_rival in rects_cartas_rival_clickeables:
+                            if idx_slot == pos_visual:
+                                pygame.draw.rect(
+                                    self.ui, color_resaltado,
+                                    rect_rival, 3
+                                )
+
+        # --- Mano del jugador ---
         carta_hover = None
         rect_hover = None
 
@@ -775,9 +814,13 @@ class Render:
                 if i == idx_hover:
                     cy -= HOVER_LEVANTAR
 
+                es_seleccionada = (hechizo_seleccionado is not None
+                                   and idx_real == hechizo_seleccionado)
+
                 self._dibujar_carta_abanico(
                     cx, cy, carta, angulo,
                     hover=(i == idx_hover),
+                    seleccionada=es_seleccionada,
                 )
         else:
             for idx_real, rect in rects_jugador:
@@ -792,19 +835,19 @@ class Render:
                 self.dibujar_carta(x_m, y_m, carta, COLOR_JUGADOR,
                                    hover=hover_j, ola=True)
 
-        # --- Zona de duelo (DESPUES de la mano, para que quede encima) ---
+        # --- Zona de duelo ---
         cx_duelo = ancho_m // 2
         cy_duelo = Layout.Y_CENTRO_DUELO
 
         if (juego.carta_jugada_enemigo is not None
-                and 0 <= juego.carta_jugada_enemigo < len(juego.mazo_enemigo)):
+                and 0 <= juego.carta_jugada_enemigo < len(juego.mazo_enemigo.cartas)):
             ce = juego.mazo_enemigo[juego.carta_jugada_enemigo]
             x = cx_duelo - Layout.CARTA_W // 2
             y = cy_duelo - Layout.CARTA_H - Layout.DUELO_SEP_Y - 2
             self.dibujar_carta(x, y, ce, COLOR_ENEMIGO, destacada=True)
 
         if (juego.carta_jugada_jugador is not None
-                and 0 <= juego.carta_jugada_jugador < len(juego.mazo_jugador)):
+                and 0 <= juego.carta_jugada_jugador < len(juego.mazo_jugador.cartas)):
             cj = juego.mazo_jugador[juego.carta_jugada_jugador]
             if getattr(cj, "tipo", "criatura") == "criatura":
                 x = cx_duelo - Layout.CARTA_W // 2
@@ -815,9 +858,24 @@ class Render:
             self._texto_centrado_mundo("VS", self.f["chica"], AMARILLO,
                                        cx_duelo, Layout.Y_VS)
 
-        # --- Tooltip (encima de todo) ---
+        # --- Tooltip ---
         if carta_hover is not None and rect_hover is not None:
             self.dibujar_tooltip(carta_hover, rect_hover.x, rect_hover.y)
+
+        # --- Mensaje de hechizo ---
+        if mensaje_hechizo:
+            self._texto_centrado_ui(
+                mensaje_hechizo.replace("zz ", ""),
+                self.f["chica"], AMARILLO,
+                ANCHO // 2, ALTO - 40
+            )
+
+        if esperando_target:
+            self._texto_centrado_ui(
+                "Elegi una carta del rival",
+                self.f["chica"], (255, 230, 100),
+                ANCHO // 2, ALTO - 70
+            )
 
         # --- Botones ---
         if btn_reiniciar is not None:
@@ -830,7 +888,7 @@ class Render:
             self.dibujar_boton(btn_siguiente, "CONTINUAR", hover_sig,
                                COLOR_BTN_VERDE, COLOR_BTN_VERDE_OFF)
 
-        # --- Mensaje de estado ---
+        # --- Mensajes de estado ---
         if juego.turno in (Turno.JUGADOR_TIRA, Turno.JUGADOR_HECHIZOS):
             if self.tiempo_turno_ms == 0:
                 self.marcar_turno_visible()

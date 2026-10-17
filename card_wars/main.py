@@ -10,6 +10,7 @@ from config import (
 from vista.fuentes import cargar_fuentes
 from vista.render import Render
 from escenas.menu import EscenaMenu
+from modelo.progreso import Progreso
 
 
 class App:
@@ -45,16 +46,10 @@ class App:
         self.clave_dificultad = DIFICULTAD_DEFAULT
         self.nivel_actual = None
 
-        # Tiempo compartido entre escenas
         self.tiempo_fondo = 0.0
 
-        # --- Progreso por dificultad ---
-        # Cada dificultad arranca con el nivel 1 desbloqueado.
-        self.progreso = {
-            "facil":  {"nivel1"},
-            "normal": {"nivel1"},
-            "duro":   {"nivel1"},
-        }
+        # --- Progreso persistente ---
+        self.progreso = Progreso()
 
         self.escena = None
         self.cambiar_escena(EscenaMenu(self))
@@ -74,6 +69,23 @@ class App:
 
     def _mouse_interno(self):
         return self._pos_interna(pygame.mouse.get_pos())
+
+    def desbloquear_siguiente_nivel(self, dificultad, nivel_actual):
+        """Desbloquea el nivel que sigue al actual (si existe)."""
+        if nivel_actual is None:
+            return
+
+        # Extraer numero del nivel (nivel1 -> 1)
+        try:
+            num = int(nivel_actual.replace("nivel", ""))
+        except ValueError:
+            return
+
+        siguiente = f"nivel{num + 1}"
+        max_nivel = 3  # por ahora hay 3 niveles
+
+        if num < max_nivel:
+            self.progreso.desbloquear(dificultad, siguiente)
 
     def run(self):
         while True:

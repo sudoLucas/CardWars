@@ -12,20 +12,15 @@ from vista.colores import (
 )
 
 
-# --- Colinas (fondo del menu) ---
 RUTA_COLINA_FRENTE = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina1.png")
 RUTA_COLINA_MEDIO  = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina2.png")
 RUTA_COLINA_FONDO  = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina3.png")
 
-# --- Casas (fondo de niveles) ---
 RUTA_CASA_1 = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "casa1.png")
 RUTA_CASA_2 = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "casa2.png")
 RUTA_CASA_3 = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "casa3.png")
 
 
-# ============================================================
-# AJUSTES DE LAS COLINAS (identicos a menu.py)
-# ============================================================
 FONDO_ZOOM        = 1.25
 FONDO_VELOCIDAD   = 0.0001
 FONDO_OFFSET_X    = 50
@@ -42,36 +37,22 @@ FRENTE_OFFSET_X   = 0
 FRENTE_OFFSET_Y   = -320
 
 
-# ============================================================
-# AJUSTES DE LAS CASAS (capas de fondo)
-# ============================================================
-# ZOOM: 1.0 = tamano original. 1.5 = 50% mas grande. 0.8 = 20% mas chica.
-# VELOCIDAD: 0.0 = quieta. 0.0002 = lenta. 0.0010 = rapida.
-# OFFSET_X: positivo = mueve a la DERECHA. negativo = mueve a la IZQUIERDA.
-# OFFSET_Y: positivo = mueve hacia ABAJO. negativo = mueve hacia ARRIBA.
-
-# --- Casa3 (la mas lejana, se dibuja primero) ---
 CASA3_ZOOM        = 1.1
 CASA3_VELOCIDAD   = 0.0001
 CASA3_OFFSET_X    = 0
 CASA3_OFFSET_Y    = 0
 
-# --- Casa2 (medio) ---
 CASA2_ZOOM        = 1.05
 CASA2_VELOCIDAD   = 0.001
 CASA2_OFFSET_X    = 25
 CASA2_OFFSET_Y    = 0
 
-# --- Casa1 (la mas cercana, se dibuja ultima) ---
 CASA1_ZOOM        = 1.01
 CASA1_VELOCIDAD   = 0.003
 CASA1_OFFSET_X    = 0
 CASA1_OFFSET_Y    = 0
 
 
-# ============================================================
-# AJUSTES DE LOS BOTONES
-# ============================================================
 SUBRAYADO_DURACION = 2.0
 ESCALA_SELECCIONADO = 1.4
 
@@ -104,12 +85,10 @@ class EscenaNiveles(Escena):
         self.timers_subrayado = [0.0] * len(self.botones)
         self.indice_anterior = 0
 
-        # --- Capas de colinas (fondo) ---
         self.capa_fondo = self._cargar(RUTA_COLINA_FONDO, "colina3")
         self.capa_medio = self._cargar(RUTA_COLINA_MEDIO, "colina2")
         self.capa_frente = self._cargar(RUTA_COLINA_FRENTE, "colina1")
 
-        # --- Capas de casas ---
         self.casa_fondo = self._cargar(RUTA_CASA_3, "casa3")
         self.casa_medio = self._cargar(RUTA_CASA_2, "casa2")
         self.casa_frente = self._cargar(RUTA_CASA_1, "casa1")
@@ -126,7 +105,7 @@ class EscenaNiveles(Escena):
 
     def _desbloqueados_actuales(self):
         dif = self.app.clave_dificultad
-        return self.app.progreso.get(dif, {"nivel1"})
+        return self.app.progreso.desbloqueados(dif)
 
     def _nivel_desbloqueado(self, clave):
         if clave == "volver":
@@ -197,60 +176,19 @@ class EscenaNiveles(Escena):
         self.render.ui.blit(img_zoom, (x_final, y_final))
 
     def _dibujar_fondo(self):
-        # 1) Colinas (atras de todo)
-        self._dibujar_capa(
-            self.capa_fondo,
-            zoom=FONDO_ZOOM,
-            velocidad=FONDO_VELOCIDAD,
-            fase=0.0,
-            offset_x=FONDO_OFFSET_X,
-            offset_y=FONDO_OFFSET_Y,
-        )
-        self._dibujar_capa(
-            self.capa_medio,
-            zoom=MEDIO_ZOOM,
-            velocidad=MEDIO_VELOCIDAD,
-            fase=1.3,
-            offset_x=MEDIO_OFFSET_X,
-            offset_y=MEDIO_OFFSET_Y,
-        )
-        self._dibujar_capa(
-            self.capa_frente,
-            zoom=FRENTE_ZOOM,
-            velocidad=FRENTE_VELOCIDAD,
-            fase=2.7,
-            offset_x=FRENTE_OFFSET_X,
-            offset_y=FRENTE_OFFSET_Y,
-        )
+        self._dibujar_capa(self.capa_fondo, FONDO_ZOOM, FONDO_VELOCIDAD, 0.0,
+                           FONDO_OFFSET_X, FONDO_OFFSET_Y)
+        self._dibujar_capa(self.capa_medio, MEDIO_ZOOM, MEDIO_VELOCIDAD, 1.3,
+                           MEDIO_OFFSET_X, MEDIO_OFFSET_Y)
+        self._dibujar_capa(self.capa_frente, FRENTE_ZOOM, FRENTE_VELOCIDAD, 2.7,
+                           FRENTE_OFFSET_X, FRENTE_OFFSET_Y)
 
-        # 2) Casas encima de las colinas
-        # casa3 -> atras
-        self._dibujar_capa(
-            self.casa_fondo,
-            zoom=CASA3_ZOOM,
-            velocidad=CASA3_VELOCIDAD,
-            fase=3.5,
-            offset_x=CASA3_OFFSET_X,
-            offset_y=CASA3_OFFSET_Y,
-        )
-        # casa2 -> medio
-        self._dibujar_capa(
-            self.casa_medio,
-            zoom=CASA2_ZOOM,
-            velocidad=CASA2_VELOCIDAD,
-            fase=4.1,
-            offset_x=CASA2_OFFSET_X,
-            offset_y=CASA2_OFFSET_Y,
-        )
-        # casa1 -> adelante
-        self._dibujar_capa(
-            self.casa_frente,
-            zoom=CASA1_ZOOM,
-            velocidad=CASA1_VELOCIDAD,
-            fase=4.7,
-            offset_x=CASA1_OFFSET_X,
-            offset_y=CASA1_OFFSET_Y,
-        )
+        self._dibujar_capa(self.casa_fondo, CASA3_ZOOM, CASA3_VELOCIDAD, 3.5,
+                           CASA3_OFFSET_X, CASA3_OFFSET_Y)
+        self._dibujar_capa(self.casa_medio, CASA2_ZOOM, CASA2_VELOCIDAD, 4.1,
+                           CASA2_OFFSET_X, CASA2_OFFSET_Y)
+        self._dibujar_capa(self.casa_frente, CASA1_ZOOM, CASA1_VELOCIDAD, 4.7,
+                           CASA1_OFFSET_X, CASA1_OFFSET_Y)
 
     def draw(self):
         ancho_m = ANCHO // ESCALA_PIXEL
@@ -271,7 +209,6 @@ class EscenaNiveles(Escena):
             x_texto, 45
         )
 
-        # --- Botones flotantes ---
         for i, (clave, texto, rect) in enumerate(self.botones):
             seleccionado = (i == self.indice)
             desbloqueado = self._nivel_desbloqueado(clave)
