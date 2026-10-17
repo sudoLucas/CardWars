@@ -62,10 +62,26 @@ class Mazo:
     def hay_vivas(self):
         return any(c.viva for c in self.cartas)
 
+    def tiene_criaturas_vivas(self):
+        """Devuelve True si al menos una carta viva es de tipo criatura."""
+        return any(c.viva and getattr(c, "tipo", "criatura") == "criatura"
+                   for c in self.cartas)
+
     def rebarajar_si_hace_falta(self, hp_dueno):
-        if not self.hay_vivas() and hp_dueno > 0:
+        """Rebaraja si no quedan vivas o si no hay criaturas vivas."""
+        if hp_dueno <= 0:
+            return False
+
+        # Si no hay vivas, barajar todo
+        if not self.hay_vivas():
             self.barajar()
             return True
+
+        # Si hay vivas pero ninguna es criatura, barajar todo
+        if not self.tiene_criaturas_vivas():
+            self.barajar()
+            return True
+
         return False
 
     def elegir_al_azar_viva(self):

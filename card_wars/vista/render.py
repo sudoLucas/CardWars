@@ -85,7 +85,7 @@ class Render:
         return math.sin(x_m * OLA_FRECUENCIA + self.tiempo * OLA_VELOCIDAD) * OLA_AMPLITUD
 
     # ==================================================
-    # DORSO (con 3D y reverso chico dentro del marco)
+    # DORSO
     # ==================================================
     def _superficie_dorso(self, reverso_img=None, indice=0):
         w, h = Layout.CARTA_W, Layout.CARTA_H
@@ -191,12 +191,11 @@ class Render:
         return surf
 
     # ==================================================
-    # CARTA DEL JUGADOR EN EL ABANICO (rotada + hover)
+    # CARTA DEL JUGADOR EN EL ABANICO
     # ==================================================
     def _dibujar_carta_abanico(self, cx_m, cy_m, carta, angulo, hover=False):
         w, h = Layout.CARTA_W, Layout.CARTA_H
-        e = self.e
-        factor = 2   # achicar el texto a la mitad (no a un cuarto)
+        factor = 2
 
         if hover:
             escala = HOVER_ESCALA
@@ -256,9 +255,8 @@ class Render:
                 )
                 txt = pygame.transform.scale(txt, tam)
                 superficie.blit(txt, (x, y))
-                return txt.get_width(), txt.get_height()
 
-            ancho_nombre, _ = _blit_texto_escalado(
+            _blit_texto_escalado(
                 surf, carta.nombre[:10], self.f["mini"], BLANCO,
                 ox + 2, oy + 2,
             )
@@ -284,9 +282,8 @@ class Render:
                 surf.blit(poder_surf,
                           (ox + w_draw // 2 - poder_surf.get_width() // 2, oy + 20))
 
-                lbl = "PODER"
                 _blit_texto_escalado(
-                    surf, lbl, self.f["mini"], BLANCO,
+                    surf, "PODER", self.f["mini"], BLANCO,
                     ox + w_draw // 2 - 18, oy + 40,
                 )
 
@@ -321,7 +318,7 @@ class Render:
         self.mundo.blit(rotada, rect_final)
 
     # ==================================================
-    # CARTA SUELTA (sigue existiendo para la zona de duelo)
+    # CARTA SUELTA
     # ==================================================
     def dibujar_carta(self, x_m, y_m, carta, color_fondo,
                       hover=False, resaltada=False, ola=False,
@@ -575,7 +572,7 @@ class Render:
         self.ui.blit(capa, (x, y))
 
     # ==================================================
-    # MANA (frasco estilo pocion, dibujado)
+    # MANA
     # ==================================================
     def dibujar_mana(self, x_m, y_m, mana, mana_max):
         w_m = 22
@@ -750,28 +747,7 @@ class Render:
                 surf = self._superficie_dorso(reverso_actual, pos_visual)
                 self.dibujar_carta_rotada(cx, cy_ola, surf, angulos[i])
 
-        # --- Zona de duelo ---
-        cx_duelo = ancho_m // 2
-        cy_duelo = Layout.Y_CENTRO_DUELO
-
-        if juego.carta_jugada_enemigo is not None:
-            ce = juego.mazo_enemigo[juego.carta_jugada_enemigo]
-            x = cx_duelo - Layout.CARTA_W // 2
-            y = cy_duelo - Layout.CARTA_H - Layout.DUELO_SEP_Y - 2
-            self.dibujar_carta(x, y, ce, COLOR_ENEMIGO, destacada=True)
-
-        if juego.carta_jugada_jugador is not None:
-            cj = juego.mazo_jugador[juego.carta_jugada_jugador]
-            if getattr(cj, "tipo", "criatura") == "criatura":
-                x = cx_duelo - Layout.CARTA_W // 2
-                y = cy_duelo + Layout.DUELO_SEP_Y
-                self.dibujar_carta(x, y, cj, COLOR_JUGADOR, destacada=True)
-
-        if juego.carta_jugada_enemigo is not None or juego.carta_jugada_jugador is not None:
-            self._texto_centrado_mundo("VS", self.f["chica"], AMARILLO,
-                                       cx_duelo, Layout.Y_VS)
-
-        # --- Mano del jugador: abanico + tooltip + hover Balatro ---
+        # --- Mano del jugador (antes del duelo para que las cartas del duelo queden encima) ---
         carta_hover = None
         rect_hover = None
 
@@ -781,7 +757,7 @@ class Render:
 
             idx_hover = -1
             for i, (idx_real, rect) in enumerate(rects_jugador):
-                if rect.collidepoint(mouse) and juego.turno == Turno.JUGADOR:
+                if rect.collidepoint(mouse) and juego.turno in (Turno.JUGADOR_TIRA, Turno.JUGADOR_HECHIZOS):
                     idx_hover = i
                     carta_hover = juego.mazo_jugador.cartas[idx_real]
                     rect_hover = rect
@@ -806,7 +782,7 @@ class Render:
         else:
             for idx_real, rect in rects_jugador:
                 carta = juego.mazo_jugador.cartas[idx_real]
-                hover_j = rect.collidepoint(mouse) and juego.turno == Turno.JUGADOR
+                hover_j = rect.collidepoint(mouse) and juego.turno in (Turno.JUGADOR_TIRA, Turno.JUGADOR_HECHIZOS)
                 if hover_j:
                     carta_hover = carta
                     rect_hover = rect
@@ -816,6 +792,30 @@ class Render:
                 self.dibujar_carta(x_m, y_m, carta, COLOR_JUGADOR,
                                    hover=hover_j, ola=True)
 
+        # --- Zona de duelo (DESPUES de la mano, para que quede encima) ---
+        cx_duelo = ancho_m // 2
+        cy_duelo = Layout.Y_CENTRO_DUELO
+
+        if (juego.carta_jugada_enemigo is not None
+                and 0 <= juego.carta_jugada_enemigo < len(juego.mazo_enemigo)):
+            ce = juego.mazo_enemigo[juego.carta_jugada_enemigo]
+            x = cx_duelo - Layout.CARTA_W // 2
+            y = cy_duelo - Layout.CARTA_H - Layout.DUELO_SEP_Y - 2
+            self.dibujar_carta(x, y, ce, COLOR_ENEMIGO, destacada=True)
+
+        if (juego.carta_jugada_jugador is not None
+                and 0 <= juego.carta_jugada_jugador < len(juego.mazo_jugador)):
+            cj = juego.mazo_jugador[juego.carta_jugada_jugador]
+            if getattr(cj, "tipo", "criatura") == "criatura":
+                x = cx_duelo - Layout.CARTA_W // 2
+                y = cy_duelo + Layout.DUELO_SEP_Y
+                self.dibujar_carta(x, y, cj, COLOR_JUGADOR, destacada=True)
+
+        if juego.carta_jugada_enemigo is not None or juego.carta_jugada_jugador is not None:
+            self._texto_centrado_mundo("VS", self.f["chica"], AMARILLO,
+                                       cx_duelo, Layout.Y_VS)
+
+        # --- Tooltip (encima de todo) ---
         if carta_hover is not None and rect_hover is not None:
             self.dibujar_tooltip(carta_hover, rect_hover.x, rect_hover.y)
 
@@ -825,13 +825,13 @@ class Render:
             self.dibujar_boton(btn_reiniciar, "REINICIAR", hover_re,
                                COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF)
 
-        if btn_siguiente is not None and juego.turno == Turno.RESOLVIENDO:
+        if btn_siguiente is not None and juego.turno == Turno.RESULTADO:
             hover_sig = btn_siguiente.collidepoint(mouse)
-            self.dibujar_boton(btn_siguiente, "SIGUIENTE", hover_sig,
+            self.dibujar_boton(btn_siguiente, "CONTINUAR", hover_sig,
                                COLOR_BTN_VERDE, COLOR_BTN_VERDE_OFF)
 
         # --- Mensaje de estado ---
-        if juego.turno == Turno.JUGADOR:
+        if juego.turno in (Turno.JUGADOR_TIRA, Turno.JUGADOR_HECHIZOS):
             if self.tiempo_turno_ms == 0:
                 self.marcar_turno_visible()
             if pygame.time.get_ticks() - self.tiempo_turno_ms < 1000:
@@ -840,7 +840,7 @@ class Render:
         else:
             self.tiempo_turno_ms = 0
 
-        if juego.turno == Turno.RESOLVIENDO:
+        if juego.turno == Turno.RESULTADO:
             self._texto_centrado_mundo("COMBATE", self.f["normal"],
                                        (255, 160, 40), cx_duelo, Layout.Y_MENSAJE)
 

@@ -33,6 +33,8 @@ def rutas_personaje(nombre):
 
 
 EMOTE_DURACION = 2500
+DELAY_IA_TIRA = 800
+DELAY_RESULTADO = 2000
 
 
 class EscenaJuego(Escena):
@@ -45,6 +47,7 @@ class EscenaJuego(Escena):
 
         self.juego = Juego(self.dificultad)
         self.tiempo_resolucion = 0
+        self.tiempo_fase = pygame.time.get_ticks()
 
         e = ESCALA_PIXEL
 
@@ -122,6 +125,7 @@ class EscenaJuego(Escena):
     def nueva_partida(self):
         self.juego = Juego(self.dificultad)
         self.tiempo_resolucion = 0
+        self.tiempo_fase = pygame.time.get_ticks()
 
         self._elegir_personajes()
         self._cargar_emotes()
@@ -142,7 +146,6 @@ class EscenaJuego(Escena):
         return ALTO // ESCALA_PIXEL
 
     def _calcular_posiciones_abanico(self, cantidad):
-        e = ESCALA_PIXEL
         ancho_m = self._ancho_mundo()
 
         cx_centro = ancho_m // 2
@@ -235,6 +238,22 @@ class EscenaJuego(Escena):
         self.hp_enemigo_anterior = self.juego.hp_enemigo
         self.mensaje_anterior = mensaje_actual
 
+    def _rect_criatura_jugador_mesa(self):
+        """Devuelve el rect donde esta la criatura del jugador en la mesa."""
+        if self.juego.carta_jugada_jugador is None:
+            return None
+        ancho_m = self._ancho_mundo()
+        e = ESCALA_PIXEL
+        cx_duelo = ancho_m // 2
+        cy_duelo = Layout.Y_CENTRO_DUELO
+
+        x_m = cx_duelo - Layout.CARTA_W // 2
+        y_m = cy_duelo + Layout.DUELO_SEP_Y
+        return pygame.Rect(
+            x_m * e, y_m * e,
+            Layout.CARTA_W * e, Layout.CARTA_H * e,
+        )
+
     def handle_event(self, evento, mouse):
         self.mouse = mouse
 
@@ -245,46 +264,77 @@ class EscenaJuego(Escena):
                 return
             if evento.key == pygame.K_r:
                 self.nueva_partida()
-            if evento.key == pygame.K_SPACE and self.juego.turno == Turno.RESOLVIENDO:
-                self.juego.siguiente_ronda()
-                self.tiempo_resolucion = 0
+
+            # Teclas rapidas para avanzar la fase RESULTADO
+            if evento.key in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_z):
+                if self.juego.turno == Turno.RESULTADO:
+                    self.juego.siguiente_ronda()
+                    self.tiempo_fase = pygame.time.get_ticks()
+                    return
 
         if evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
             if self.boton_reiniciar.collidepoint(mouse):
                 self.nueva_partida()
                 return
 
-            if self.juego.turno == Turno.JUGADOR:
+            # Fase RESULTADO: click en CONTINUAR
+            if self.juego.turno == Turno.RESULTADO:
+                if self.boton_siguiente.collidepoint(mouse):
+                    self.juego.siguiente_ronda()
+                    self.tiempo_fase = pygame.time.get_ticks()
+                    return
+
+            # Fase JUGADOR_TIRA: clickear una criatura de la mano
+            if self.juego.turno == Turno.JUGADOR_TIRA:
+                for idx, rect in self.rects_jugador:
+                    if rect.collidepoint(mouse):
+                        carta = self.juego.mazo_jugador[idx]
+                        if carta.tipo == "criatura":
+                            self.juego.jugador_tira_carta(idx)
+                            self.tiempo_fase = pygame.time.get_ticks()
+                        break
+
+            # Fase JUGADOR_HECHIZOS: clickear hechizo o la criatura en la mesa
+            elif self.juego.turno == Turno.JUGADOR_HECHIZOS:
+                # Primero: click en la criatura del jugador en la mesa -> pelear
+                rect_mesa = self._rect_criatura_jugador_mesa()
+                if rect_mesa is not None and rect_mesa.collidepoint(mouse):
+                    self.juego.iniciar_duelo()
+                    self.tiempo_fase = pygame.time.get_ticks()
+                    return
+
+                # Sino: click en un hechizo de la mano
                 for idx, rect in self.rects_jugador:
                     if rect.collidepoint(mouse):
                         carta = self.juego.mazo_jugador[idx]
                         if carta.tipo == "hechizo":
                             self.juego.usar_hechizo(idx, target_idx=0)
-                        else:
-                            self.juego.jugador_tira_carta(idx)
-                            self.tiempo_resolucion = pygame.time.get_ticks()
                         break
-
-            elif self.juego.turno == Turno.RESOLVIENDO:
-                if self.boton_siguiente.collidepoint(mouse):
-                    self.juego.siguiente_ronda()
-                    self.tiempo_resolucion = 0
 
     def update(self, dt):
         self.render.tick(dt)
         self.calcular_rects()
         self._actualizar_emotes()
 
-        if self.juego.turno == Turno.RESOLVIENDO:
-            if pygame.time.get_ticks() - self.tiempo_resolucion > DUELO_DURACION:
-                self.juego.siguiente_ronda()
-                self.tiempo_resolucion = 0
+        ahora = pygame.time.get_ticks()
 
+        # Fase IA_TIRA: la IA tira automaticamente tras un delay
+        if self.juego.turno == Turno.IA_TIRA:
+            if ahora - self.tiempo_fase > DELAY_IA_TIRA:
+                self.juego.ia_tira_carta()
+                self.tiempo_fase = ahora
+
+        # Fase RESULTADO: NO avanza sola. Espera click en CONTINUAR o tecla.
+
+        # Fin de partida
         if self.juego.turno == Turno.FIN:
             from escenas.fin import EscenaFin
             self.app.cambiar_escena(EscenaFin(self.app, self.juego))
 
     def draw(self):
+        print(f"TURNO: {self.juego.turno}, RONDA: {self.juego.ronda}, "
+              f"MANO: {len([c for c in self.juego.mazo_jugador.cartas if c.viva])}, "
+              f"MANO_E: {len([c for c in self.juego.mazo_enemigo.cartas if c.viva])}")
         self.render.dibujar_escena(
             self.juego, self.rects_jugador, self.rects_enemigo, self.mouse,
             self.boton_reiniciar, self.boton_siguiente,

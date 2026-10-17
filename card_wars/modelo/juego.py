@@ -1,5 +1,6 @@
 # modelo/juego.py
 import random
+import pygame
 from config import (
     Turno, HECHIZOS,
     MANA_INICIAL, MANA_MAXIMO, MANA_SUMA_MIN, MANA_SUMA_MAX,
@@ -25,12 +26,14 @@ class Juego:
         self.hp_enemigo_max = self.dificultad.hp_enemigo
         self.mana_jugador = MANA_INICIAL
         self.mana_enemigo = MANA_INICIAL
-        self.turno = Turno.JUGADOR
         self.ronda = 1
-        self.mensaje = "zz Round one: elegi una carta pa' bajar"
+        self.turno = Turno.IA_TIRA
+        self.mensaje = "zz La IA elige su carta..."
         self.carta_jugada_jugador = None
         self.carta_jugada_enemigo = None
         self.mensaje_hechizo = ""
+        self.carta_vision_idx = None
+        self.vision_activa_hasta = 0
 
     # ---------- Mana ----------
     def sumar_mana(self):
@@ -50,9 +53,38 @@ class Juego:
         else:
             self.mana_enemigo = max(0, self.mana_enemigo - costo)
 
-    # ---------- Turno del jugador ----------
+    # ---------- Fase: IA tira primero ----------
+    def ia_tira_carta(self):
+        if self.turno != Turno.IA_TIRA:
+            return
+
+        # Si no hay criaturas vivas, rebarajar
+        self.mazo_enemigo.rebarajar_si_hace_falta(self.hp_enemigo)
+
+        carta_e, idx_e = self.estrategia.elegir(
+            self.mazo_enemigo, self.mazo_jugador,
+            self.hp_enemigo, self.hp_jugador,
+        )
+
+        if carta_e is None:
+            # Fallback: si por algún motivo no hay criaturas,
+            # rebarajar y volver a intentar una vez.
+            self.mazo_enemigo.barajar()
+            carta_e, idx_e = self.estrategia.elegir(
+                self.mazo_enemigo, self.mazo_jugador,
+                self.hp_enemigo, self.hp_jugador,
+            )
+            if carta_e is None:
+                self.chequear_fin()
+                return
+
+        self.carta_jugada_enemigo = idx_e
+        self.turno = Turno.JUGADOR_TIRA
+        self.mensaje = "zz Tu turno: elegi una criatura para bajar"
+
+    # ---------- Fase: jugador tira ----------
     def jugador_tira_carta(self, idx):
-        if self.turno != Turno.JUGADOR:
+        if self.turno != Turno.JUGADOR_TIRA:
             return
         if idx >= len(self.mazo_jugador):
             return
@@ -61,57 +93,23 @@ class Juego:
         if not carta_j.viva:
             self.mensaje = "zz Carta descartada"
             return
-
-        if carta_j.tipo == "hechizo":
-            return
-
-        if not self.mazo_enemigo.hay_vivas():
-            self.mazo_enemigo.rebarajar_si_hace_falta(self.hp_enemigo)
-
-        carta_e, idx_e = self.estrategia.elegir(
-            self.mazo_enemigo, self.mazo_jugador,
-            self.hp_enemigo, self.hp_jugador,
-        )
-
-        if carta_e is None:
-            self.chequear_fin()
+        if getattr(carta_j, "tipo", "criatura") != "criatura":
+            self.mensaje_hechizo = "zz Solo podes tirar criaturas aca"
             return
 
         self.carta_jugada_jugador = idx
-        self.carta_jugada_enemigo = idx_e
+        self.turno = Turno.JUGADOR_HECHIZOS
+        self.mensaje = "zz Podes usar hechizos o clickear tu criatura para pelear"
 
-        self.resolver_batalla(carta_j, carta_e)
-        self.turno = Turno.RESOLVIENDO
-        self.chequear_fin()
-
-    # ---------- Resolucion 1 vs 1 ----------
-    def resolver_batalla(self, carta_j, carta_e):
-        if carta_j.poder > carta_e.poder:
-            dano = carta_j.poder - carta_e.poder
-            carta_e.recibir_golpe(carta_j.poder)
-            self.hp_enemigo -= dano
-            self.mensaje = (f"zz {carta_j.nombre} ({carta_j.poder}) vence a "
-                            f"{carta_e.nombre} ({carta_e.poder}) - {dano} HP al rival")
-        elif carta_e.poder > carta_j.poder:
-            dano = carta_e.poder - carta_j.poder
-            carta_j.recibir_golpe(carta_e.poder)
-            self.hp_jugador -= dano
-            self.mensaje = (f"zz {carta_e.nombre} ({carta_e.poder}) vence a "
-                            f"{carta_j.nombre} ({carta_j.poder}) - {dano} HP a ti")
-        else:
-            carta_j.morir()
-            carta_e.morir()
-            self.mensaje = "zz Empate: las cartas se mataron"
-
-    # ---------- Hechizos ----------
+    # ---------- Fase: jugador hechizos ----------
     def usar_hechizo(self, idx_carta, target_idx=None):
-        if self.turno != Turno.JUGADOR:
+        if self.turno != Turno.JUGADOR_HECHIZOS:
             return False
         if idx_carta >= len(self.mazo_jugador):
             return False
 
         carta = self.mazo_jugador[idx_carta]
-        if carta.tipo != "hechizo" or not carta.viva:
+        if getattr(carta, "tipo", "criatura") != "hechizo" or not carta.viva:
             return False
 
         data = HECHIZOS[carta.hechizo_id]
@@ -122,14 +120,19 @@ class Juego:
             return False
 
         hid = carta.hechizo_id
-        target = data["target"]
         resultado = False
 
         if hid == "vision":
-            self.mensaje_hechizo = "zz Mira una carta del rival"
+            if target_idx is None:
+                return False
+            self.carta_vision_idx = target_idx
+            self.vision_activa_hasta = pygame.time.get_ticks() + 1500
+            self.mensaje_hechizo = "zz Mirando una carta del rival"
             resultado = True
 
         elif hid == "robo":
+            if target_idx is None:
+                return False
             self._robar_carta_rival(target_idx)
             self.mensaje_hechizo = "zz Robaste una carta"
             resultado = True
@@ -145,6 +148,15 @@ class Juego:
             if criatura_e is not None:
                 criatura_e.recibir_golpe(data["daño"])
                 self.mensaje_hechizo = f"zz -{data['daño']} a la criatura rival"
+                resultado = True
+
+        elif hid == "drenaje":
+            criatura_e = self._criatura_jugada_enemiga()
+            if criatura_e is not None:
+                criatura_e.recibir_golpe(data["daño"])
+                self.hp_jugador = min(self.hp_jugador_max,
+                                      self.hp_jugador + data["curacion"])
+                self.mensaje_hechizo = f"zz -{data['daño']} rival, +{data['curacion']} HP"
                 resultado = True
 
         elif hid == "fuerza":
@@ -187,19 +199,89 @@ class Juego:
 
         return resultado
 
+    def hechizo_es_usable(self, idx_carta):
+        if idx_carta >= len(self.mazo_jugador):
+            return False
+        carta = self.mazo_jugador[idx_carta]
+        if getattr(carta, "tipo", "criatura") != "hechizo" or not carta.viva:
+            return False
+        data = HECHIZOS[carta.hechizo_id]
+        if not self.puede_pagar("jugador", data["costo"]):
+            return False
+        target = data["target"]
+        if target == "criatura_rival":
+            if self._criatura_jugada_enemiga() is None:
+                return False
+        elif target == "criatura_propia":
+            if self._criatura_jugada_jugador() is None:
+                return False
+        return True
+
+    # ---------- Fase: duelo ----------
+    def iniciar_duelo(self):
+        if self.turno != Turno.JUGADOR_HECHIZOS:
+            return False
+        if self.carta_jugada_jugador is None or self.carta_jugada_enemigo is None:
+            return False
+
+        carta_j = self.mazo_jugador[self.carta_jugada_jugador]
+        carta_e = self.mazo_enemigo[self.carta_jugada_enemigo]
+
+        self._ia_usar_hechizos()
+
+        self.turno = Turno.DUELO
+        self.resolver_batalla(carta_j, carta_e)
+        self.turno = Turno.RESULTADO
+        self.chequear_fin()
+        return True
+
+    def resolver_batalla(self, carta_j, carta_e):
+        if carta_j.poder > carta_e.poder:
+            dano = carta_j.poder - carta_e.poder
+            carta_e.recibir_golpe(carta_j.poder)
+            self.hp_enemigo -= dano
+            self.mensaje = (f"zz {carta_j.nombre} ({carta_j.poder}) vence a "
+                            f"{carta_e.nombre} ({carta_e.poder}) - {dano} HP al rival")
+        elif carta_e.poder > carta_j.poder:
+            dano = carta_e.poder - carta_j.poder
+            carta_j.recibir_golpe(carta_e.poder)
+            self.hp_jugador -= dano
+            self.mensaje = (f"zz {carta_e.nombre} ({carta_e.poder}) vence a "
+                            f"{carta_j.nombre} ({carta_j.poder}) - {dano} HP a ti")
+        else:
+            carta_j.morir()
+            carta_e.morir()
+            self.mensaje = "zz Empate: las cartas se mataron"
+
+    # ---------- IA usa hechizos ----------
+    def _ia_usar_hechizos(self):
+        if hasattr(self.estrategia, "usar_hechizo"):
+            self.estrategia.usar_hechizo(self)
+        if self.mensaje_hechizo:
+            self.mensaje_hechizo = ""
+
+    # ---------- Helpers ----------
     def _criatura_jugada_jugador(self):
         if self.carta_jugada_jugador is None:
             return None
+        if self.carta_jugada_jugador >= len(self.mazo_jugador.cartas):
+            return None
         c = self.mazo_jugador[self.carta_jugada_jugador]
-        if c.tipo != "criatura":
+        if getattr(c, "tipo", "criatura") != "criatura":
+            return None
+        if not c.viva:
             return None
         return c
 
     def _criatura_jugada_enemiga(self):
         if self.carta_jugada_enemigo is None:
             return None
+        if self.carta_jugada_enemigo >= len(self.mazo_enemigo.cartas):
+            return None
         c = self.mazo_enemigo[self.carta_jugada_enemigo]
-        if c.tipo != "criatura":
+        if getattr(c, "tipo", "criatura") != "criatura":
+            return None
+        if not c.viva:
             return None
         return c
 
@@ -228,8 +310,8 @@ class Juego:
 
         self.sumar_mana()
 
-        self.turno = Turno.JUGADOR
-        self.mensaje = f"zz Ronda {self.ronda}"
+        self.turno = Turno.IA_TIRA
+        self.mensaje = "zz La IA elige su carta..."
         self.chequear_fin()
 
     # ---------- Fin de partida ----------

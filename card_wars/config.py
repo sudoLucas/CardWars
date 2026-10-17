@@ -36,24 +36,16 @@ DIRECTORIO_RAIZ = os.path.dirname(os.path.abspath(__file__))
 # ============================================================
 # VENTANA / RENDER
 # ============================================================
-# --- Resolucion interna del juego (NUNCA cambia) ---
-# Todo el gameplay, textos, etc. se dibujan a esta resolucion.
 RESOLUCION_INTERNA_W, RESOLUCION_INTERNA_H = 1200, 800
 
-# --- Tamano de la VENTANA al abrir ---
-# Pygame escala la resolucion interna a este tamano automaticamente.
-# MANTENER la proporcion 3:2 para que no se estire (ej: 900x600, 750x500).
 VENTANA_W, VENTANA_H = 900, 600
 
-# Compatibilidad: ANCHO/ALTO siguen siendo la resolucion interna.
 ANCHO, ALTO = RESOLUCION_INTERNA_W, RESOLUCION_INTERNA_H
 
 FPS = 60
 
-# Ruta absoluta a la fuente pixel art
 RUTA_FUENTE = os.path.join(DIRECTORIO_RAIZ, "assets", "fuentes", "pixel.ttf")
 
-# Escala pixel art: cada unidad del mundo = ESCALA_PIXEL pixeles reales
 ESCALA_PIXEL = 4
 
 
@@ -75,9 +67,12 @@ def inicializar_ventana():
 # ESTADOS
 # ============================================================
 class Turno:
-    JUGADOR     = "jugador"
-    RESOLVIENDO = "resolviendo"
-    FIN         = "fin"
+    IA_TIRA          = "ia_tira"
+    JUGADOR_TIRA     = "jugador_tira"
+    JUGADOR_HECHIZOS = "jugador_hechizos"
+    DUELO            = "duelo"
+    RESULTADO        = "resultado"
+    FIN              = "fin"
 
 
 class Escena:
@@ -128,24 +123,20 @@ class Layout:
 # BOTONES (en unidades del MUNDO)
 # ============================================================
 class Botones:
-    # REINICIAR (abajo a la izquierda, no pisa cartas)
     REINICIAR_W, REINICIAR_H = 60, 12
     REINICIAR_X = 8
     REINICIAR_Y = 185
 
-    # SIGUIENTE RONDA (abajo a la derecha)
     SIGUIENTE_W, SIGUIENTE_H = 70, 12
     SIGUIENTE_X = 300 - 78
     SIGUIENTE_Y = 185
 
-    # MENU (esquina inferior izquierda, juntos)
     MENU_W, MENU_H = 80, 8
-    MENU_ESPACIO_Y = 3       # padding vertical entre botones
-    MENU_X_MARGEN = 12       # margen desde el borde izquierdo
-    MENU_Y_MARGEN = 12       # margen desde el borde inferior
-    MENU_BORDE_GROSOR = 1    # grosor del borde del contenedor (en unidades del mundo)
+    MENU_ESPACIO_Y = 3
+    MENU_X_MARGEN = 12
+    MENU_Y_MARGEN = 12
+    MENU_BORDE_GROSOR = 1
 
-    # DIFICULTAD
     DIFICULTAD_W, DIFICULTAD_H = 90, 14
     DIFICULTAD_ESPACIO_Y       = 35
 
@@ -210,6 +201,14 @@ HECHIZOS = {
         "target": "carta_rival",
         "descripcion": "Robar una carta del rival",
     },
+        "drenaje": {
+        "nombre": "Drenaje",
+        "costo": 3,
+        "target": "criatura_rival",
+        "daño": 8,
+        "curacion": 8,
+        "descripcion": "8 de dano a una criatura rival y te cura 8 HP",
+    },
     "inmovilizar": {
         "nombre": "Inmovilizar",
         "costo": 4,
@@ -219,8 +218,10 @@ HECHIZOS = {
 }
 
 POOL_HECHIZOS = [
+
     "vision", "fuerza", "defensa", "curacion",
     "rayo", "debilidad", "robo", "inmovilizar",
+    "drenaje",
 ]
 
 
@@ -278,6 +279,10 @@ DIFICULTAD_DEFAULT = "normal"
 # ============================================================
 DUELO_DURACION = 1500
 
+
+# ============================================================
+# POOL DE CARTAS
+# ============================================================
 POOL_CARTAS = [
     ("Gato",    5),
     ("Slime",   5),
