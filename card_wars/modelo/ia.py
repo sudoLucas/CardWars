@@ -1,13 +1,4 @@
 # modelo/ia.py
-"""
-Estrategias de IA para el rival.
-
-Todas heredan de Estrategia e implementan:
-    elegir(mazo_propio, mazo_rival, hp_propio, hp_rival) -> (carta, idx)
-
-El Juego solo llama a .elegir(). No sabe ni le importa como decide cada una.
-"""
-
 import random
 from config import HECHIZOS
 
@@ -69,7 +60,6 @@ class IAConservadora(Estrategia):
         return elegida, mazo_propio.indice(elegida)
 
     def usar_hechizo(self, juego):
-        """Usa curacion si esta muy lastimada."""
         if juego.hp_enemigo >= juego.hp_enemigo_max * 0.4:
             return
 
@@ -128,7 +118,6 @@ class IAAdaptativa(Estrategia):
         return elegida, mazo_propio.indice(elegida)
 
     def usar_hechizo(self, juego):
-        """Usa hechizos agresivos si conviene."""
         for carta in juego.mazo_enemigo.cartas:
             if carta.tipo != "hechizo" or not carta.viva:
                 continue
@@ -188,12 +177,27 @@ class IAAdaptativa(Estrategia):
 
 
 # ============================================================
+# TUTORIAL - Siempre tira la mas debil
+# ============================================================
+class IATutorial(Estrategia):
+    nombre = "Tutorial"
+
+    def elegir(self, mazo_propio, mazo_rival, hp_propio, hp_rival):
+        criaturas = [c for c in mazo_propio.vivas() if c.tipo == "criatura"]
+        if not criaturas:
+            return None, None
+        elegida = min(criaturas, key=lambda c: c.poder)
+        return elegida, mazo_propio.indice(elegida)
+
+
+# ============================================================
 # REGISTRO
 # ============================================================
 ESTRATEGIAS = {
-    "IARandom":        IARandom,
-    "IAConservadora":  IAConservadora,
-    "IAAdaptativa":    IAAdaptativa,
+    "IARandom":       IARandom,
+    "IAConservadora": IAConservadora,
+    "IAAdaptativa":   IAAdaptativa,
+    "IATutorial":     IATutorial,
 }
 
 

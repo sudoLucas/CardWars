@@ -165,14 +165,14 @@ HECHIZOS = {
         "costo": 2,
         "target": "criatura_propia",
         "bonus_poder": 5,
-        "descripcion": "+5 poder a tu criatura este turno",
+        "descripcion": "+5 poder a tu criatura",
     },
     "defensa": {
         "nombre": "Pocion de defensa",
         "costo": 2,
         "target": "criatura_propia",
         "bonus_aguante": 5,
-        "descripcion": "+5 vida a tu criatura este turno",
+        "descripcion": "+5 vida a tu criatura",
     },
     "curacion": {
         "nombre": "Curacion",
@@ -186,14 +186,14 @@ HECHIZOS = {
         "costo": 3,
         "target": "criatura_rival",
         "daño": 10,
-        "descripcion": "10 de dano a una criatura rival",
+        "descripcion": "10 de daño a una criatura rival",
     },
     "debilidad": {
         "nombre": "Debilidad",
         "costo": 3,
         "target": "criatura_rival",
         "bonus_poder": -5,
-        "descripcion": "-5 poder a una criatura rival este turno",
+        "descripcion": "-5 poder a una criatura rival",
     },
     "robo": {
         "nombre": "Robo",
@@ -207,7 +207,7 @@ HECHIZOS = {
         "target": "criatura_rival",
         "daño": 8,
         "curacion": 8,
-        "descripcion": "8 de dano a una criatura rival y te cura 8 HP",
+        "descripcion": "Drena 8 de HP del rival",
     },
     "inmovilizar": {
         "nombre": "Inmovilizar",
@@ -265,10 +265,59 @@ DIFICULTAD_DURO = ConfigDificultad(
     descripcion   = "",
 )
 
+DIFICULTAD_TUTORIAL = ConfigDificultad(
+    nombre        = "Tutorial",
+    hp_jugador    = 250,
+    hp_enemigo    = 250,
+    tamano_mazo   = 3,
+    estrategia_ia = "IATutorial",
+    descripcion   = "Aprende a jugar en 3 rondas.",
+)
+
+# ============================================================
+# TUTORIAL
+# ============================================================
+TUTORIAL_ROUNDS = 3
+
+# Textos por ronda (con zz adelante)
+DIALOGOS_TUTORIAL = {
+    1: [
+        "zz El rival ya bajo una criatura. Vas a ver su carta revelada en el centro.",
+        "zz Ahora baja la tuya: hace click en una de las cartas de tu mano.",
+        "zz Antes de pelear, podes mirar tu carta. Con el mouse encima, ves sus datos.",
+        "zz Cuando estes listo, hace click de nuevo en tu criatura para iniciar el duelo.",
+        "zz Si tu criatura tiene mas poder que la del rival, ganas el duelo.",
+    ],
+    2: [
+        "zz Bien. Antes de pelear, proba los hechizos.",
+        "zz Vision revela una carta del rival. Robo te la roba y la guardas.",
+        "zz Los hechizos cuestan mana. El mana sube un poco cada ronda.",
+        "zz Hace click en un hechizo y despues en el slot de la carta del rival.",
+        "zz Ahora si, a pelear. Click en tu criatura.",
+    ],
+    3: [
+        "zz Ahora una ronda vos solo.",
+        "zz Tira tu criatura y pelea cuando estes listo.",
+        "zz Ya sabes jugar. Ahora jugate un duelo de verdad.",
+    ],
+}
+
+
+@dataclass(frozen=True)
+class ConfigTutorial:
+    nombre:           str
+    hp_jugador:       int
+    hp_enemigo:       int
+    tamano_mazo:      int
+    estrategia_ia:    str
+    descripcion:      str
+    es_tutorial:      bool = True
+
 DIFICULTADES = {
-    "facil":  DIFICULTAD_FACIL,
-    "normal": DIFICULTAD_NORMAL,
-    "duro":   DIFICULTAD_DURO,
+    "tutorial": DIFICULTAD_TUTORIAL,
+    "facil":    DIFICULTAD_FACIL,
+    "normal":   DIFICULTAD_NORMAL,
+    "duro":     DIFICULTAD_DURO,
 }
 
 DIFICULTAD_DEFAULT = "normal"

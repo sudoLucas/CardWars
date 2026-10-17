@@ -252,72 +252,72 @@ class Render:
                          (ox + 1, oy + h_draw - 2),
                          (ox + w_draw - 2, oy + h_draw - 2), 1)
 
-        if hover or seleccionada:
-            def _blit_texto_escalado(superficie, texto, fuente, color_txt, x, y):
-                txt = fuente.render(texto, False, color_txt)
-                tam = (
-                    max(1, txt.get_width() // factor),
-                    max(1, txt.get_height() // factor),
-                )
-                txt = pygame.transform.scale(txt, tam)
-                superficie.blit(txt, (x, y))
+        # --- TEXTO SIEMPRE VISIBLE ---
+        def _blit_texto_escalado(superficie, texto, fuente, color_txt, x, y):
+            txt = fuente.render(texto, False, color_txt)
+            tam = (
+                max(1, txt.get_width() // factor),
+                max(1, txt.get_height() // factor),
+            )
+            txt = pygame.transform.scale(txt, tam)
+            superficie.blit(txt, (x, y))
+
+        _blit_texto_escalado(
+            surf, carta.nombre[:10], self.f["mini"], BLANCO,
+            ox + 2, oy + 2,
+        )
+
+        if es_hechizo:
+            _blit_texto_escalado(
+                surf, "HECHIZO", self.f["mini"], COLOR_HECHIZO_BRILLO,
+                ox + w_draw // 2 - 20, oy + 20,
+            )
+            _blit_texto_escalado(
+                surf, f"{carta.costo_mana} mana", self.f["mini"], AMARILLO,
+                ox + w_draw // 2 - 20, oy + 36,
+            )
+        else:
+            poder_txt = str(carta.poder) if carta.viva else "0"
+            poder_color = AMARILLO if carta.viva else GRIS_OSCURO
+            poder_surf = self.f["chica"].render(poder_txt, False, poder_color)
+            tam_p = (
+                max(1, poder_surf.get_width() // factor),
+                max(1, poder_surf.get_height() // factor),
+            )
+            poder_surf = pygame.transform.scale(poder_surf, tam_p)
+            surf.blit(poder_surf,
+                      (ox + w_draw // 2 - poder_surf.get_width() // 2, oy + 20))
 
             _blit_texto_escalado(
-                surf, carta.nombre[:10], self.f["mini"], BLANCO,
-                ox + 2, oy + 2,
+                surf, "PODER", self.f["mini"], BLANCO,
+                ox + w_draw // 2 - 18, oy + 40,
             )
 
-            if es_hechizo:
-                _blit_texto_escalado(
-                    surf, "HECHIZO", self.f["mini"], COLOR_HECHIZO_BRILLO,
-                    ox + w_draw // 2 - 20, oy + 20,
+            if carta.viva:
+                max_ag = getattr(carta, "poder_original", carta.poder)
+                ancho_max = w_draw - 6
+                ancho_actual = int(ancho_max * carta.aguante / max_ag) if max_ag > 0 else 0
+                barra_y = oy + h_draw - 8
+                pygame.draw.rect(surf, COLOR_FONDO_BARRA,
+                                 (ox + 3, barra_y, ancho_max, 2))
+                pygame.draw.rect(surf, COLOR_AGUANTE,
+                                 (ox + 3, barra_y, ancho_actual, 2))
+
+                txt_ag = f"{carta.aguante}/{max_ag}"
+                ag_surf = self.f["mini"].render(txt_ag, False, COLOR_AGUANTE)
+                tam_ag = (
+                    max(1, ag_surf.get_width() // factor),
+                    max(1, ag_surf.get_height() // factor),
                 )
-                _blit_texto_escalado(
-                    surf, f"{carta.costo_mana} mana", self.f["mini"], AMARILLO,
-                    ox + w_draw // 2 - 20, oy + 36,
-                )
+                ag_surf = pygame.transform.scale(ag_surf, tam_ag)
+                surf.blit(ag_surf,
+                          (ox + w_draw // 2 - ag_surf.get_width() // 2,
+                           oy + h_draw - 16))
             else:
-                poder_txt = str(carta.poder) if carta.viva else "0"
-                poder_color = AMARILLO if carta.viva else GRIS_OSCURO
-                poder_surf = self.f["chica"].render(poder_txt, False, poder_color)
-                tam_p = (
-                    max(1, poder_surf.get_width() // factor),
-                    max(1, poder_surf.get_height() // factor),
-                )
-                poder_surf = pygame.transform.scale(poder_surf, tam_p)
-                surf.blit(poder_surf,
-                          (ox + w_draw // 2 - poder_surf.get_width() // 2, oy + 20))
-
-                _blit_texto_escalado(
-                    surf, "PODER", self.f["mini"], BLANCO,
-                    ox + w_draw // 2 - 18, oy + 40,
-                )
-
-                if carta.viva:
-                    max_ag = getattr(carta, "poder_original", carta.poder)
-                    ancho_max = w_draw - 6
-                    ancho_actual = int(ancho_max * carta.aguante / max_ag) if max_ag > 0 else 0
-                    barra_y = oy + h_draw - 8
-                    pygame.draw.rect(surf, COLOR_FONDO_BARRA,
-                                     (ox + 3, barra_y, ancho_max, 2))
-                    pygame.draw.rect(surf, COLOR_AGUANTE,
-                                     (ox + 3, barra_y, ancho_actual, 2))
-
-                    txt_ag = f"{carta.aguante}/{max_ag}"
-                    ag_surf = self.f["mini"].render(txt_ag, False, COLOR_AGUANTE)
-                    tam_ag = (
-                        max(1, ag_surf.get_width() // factor),
-                        max(1, ag_surf.get_height() // factor),
-                    )
-                    ag_surf = pygame.transform.scale(ag_surf, tam_ag)
-                    surf.blit(ag_surf,
-                              (ox + w_draw // 2 - ag_surf.get_width() // 2,
-                               oy + h_draw - 16))
-                else:
-                    cxm = ox + w_draw // 2
-                    cym = oy + h_draw // 2
-                    pygame.draw.line(surf, ROJO, (cxm - 5, cym - 5), (cxm + 5, cym + 5), 1)
-                    pygame.draw.line(surf, ROJO, (cxm + 5, cym - 5), (cxm - 5, cym + 5), 1)
+                cxm = ox + w_draw // 2
+                cym = oy + h_draw // 2
+                pygame.draw.line(surf, ROJO, (cxm - 5, cym - 5), (cxm + 5, cym + 5), 1)
+                pygame.draw.line(surf, ROJO, (cxm + 5, cym - 5), (cxm - 5, cym + 5), 1)
 
         rotada = pygame.transform.rotate(surf, angulo)
         rect_final = rotada.get_rect(center=(cx_m, cy_m))
@@ -456,31 +456,56 @@ class Render:
     # ==================================================
     # TOOLTIP
     # ==================================================
+    # ==================================================
+    # TOOLTIP
+    # ==================================================
     def dibujar_tooltip(self, carta, x, y):
         es_hechizo = (getattr(carta, "tipo", "criatura") == "hechizo")
+        ancho = 220
+        alto = 78  # Altura fija para 3 lineas + margenes
+        
+        rect = pygame.Rect(x, y - alto - 10, ancho, alto)
+        
+        # Fondo semitransparente y borde
+        pygame.draw.rect(self.ui, (20, 20, 30, 240), rect)
+        pygame.draw.rect(self.ui, BLANCO, rect, 2)
 
         if es_hechizo:
             data = HECHIZOS.get(carta.hechizo_id, {})
-            lineas = [
-                f"{data.get('nombre', carta.nombre)}",
-                data.get("descripcion", ""),
-            ]
+            
+            # Linea 1: Nombre en Amarillo
+            self._texto_ui(data.get("nombre", carta.nombre), self.f["mini"], AMARILLO, 
+                           rect.x + 8, rect.y + 8)
+            
+            # Linea 2 y 3: Descripcion
+            texto = data.get("descripcion", "")
+            palabras = texto.split(' ')
+            
+            # Calculamos cuantas palabras entran en 1 linea
+            lineas = []
+            linea_actual = ""
+            for p in palabras:
+                test_linea = linea_actual + p + " "
+                # 190 es el ancho util en pixeles de la fuente mini
+                if self.f["mini"].size(test_linea)[0] < (ancho - 20):
+                    linea_actual = test_linea
+                else:
+                    lineas.append(linea_actual.strip())
+                    linea_actual = p + " "
+            if linea_actual:
+                lineas.append(linea_actual.strip())
+                
+            # Imprimimos hasta 2 lineas de descripcion
+            if len(lineas) > 0:
+                self._texto_ui(lineas[0], self.f["mini"], BLANCO, rect.x + 8, rect.y + 30)
+            if len(lineas) > 1:
+                self._texto_ui(lineas[1], self.f["mini"], BLANCO, rect.x + 8, rect.y + 52)
+
         else:
-            lineas = [
-                f"{carta.nombre}",
-                f"{carta.poder} dano",
-                f"{carta.aguante} vida",
-            ]
-
-        ancho = 180
-        alto = 12 + len(lineas) * 20
-        rect = pygame.Rect(x, y - alto - 6, ancho, alto)
-        pygame.draw.rect(self.ui, (20, 20, 30, 230), rect)
-        pygame.draw.rect(self.ui, BLANCO, rect, 1)
-
-        for i, linea in enumerate(lineas):
-            self._texto_ui(linea, self.f["mini"], BLANCO,
-                           x + 8, y - alto - 6 + 6 + i * 20)
+            # Es una criatura
+            self._texto_ui(carta.nombre, self.f["mini"], AMARILLO, rect.x + 8, rect.y + 8)
+            self._texto_ui(f"{carta.poder} dano", self.f["mini"], BLANCO, rect.x + 8, rect.y + 30)
+            self._texto_ui(f"{carta.aguante} vida", self.f["mini"], BLANCO, rect.x + 8, rect.y + 52)
 
     def dibujar_carta_rotada(self, cx_m, cy_m, surf, angulo):
         rotacion_extra = math.sin(self.tiempo * 0.0018 + cx_m * 0.04) * 4
@@ -660,7 +685,8 @@ class Render:
                        rects_cartas_rival_clickeables=None,
                        mensaje_hechizo=None,
                        carta_vision_idx=None,
-                       vision_activa_hasta=0):
+                       vision_activa_hasta=0,
+                       foco_teclado=0):
         self.mundo.fill(COLOR_FONDO_BARRA)
 
         if mesa_img is not None:
@@ -670,7 +696,6 @@ class Render:
                 mesa_img, (MESA_ANCHO, MESA_ALTO)
             )
             mesa_x = (self.mundo.get_width() - MESA_ANCHO) // 2
-            # Bajamos la mesa: le restamos MENOS
             mesa_y = Layout.Y_CENTRO_DUELO - (MESA_ALTO // 2)
             self.mundo.blit(mesa_escalada, (mesa_x, mesa_y))
 

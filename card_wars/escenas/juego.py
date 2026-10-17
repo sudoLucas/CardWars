@@ -61,6 +61,7 @@ class EscenaJuego(Escena):
         self.posiciones_jugador = []
         self.rects_enemigo = []
         self.mouse = (0, 0)
+        self.foco_teclado = 0
 
         self.hp_img = self._cargar(RUTA_HP)
         self.mesa_img = self._cargar(RUTA_MESA)
@@ -140,6 +141,7 @@ class EscenaJuego(Escena):
         self.hechizo_seleccionado = None
         self.mensaje_hechizo_temporal = ""
         self.tiempo_mensaje_hechizo = 0
+        self.foco_teclado = 0
 
     def _ancho_mundo(self):
         return ANCHO // ESCALA_PIXEL
@@ -152,11 +154,7 @@ class EscenaJuego(Escena):
         alto_m = self._alto_mundo()
 
         cx_centro = ancho_m // 2
-        
-        # Margen inferior en unidades del mundo (ej: 2 = 8px reales)
         MARGEN_INFERIOR = 2
-        
-        # La Y del centro de la carta para que el borde inferior toque el margen
         cy_centro = alto_m - MARGEN_INFERIOR - (Layout.CARTA_H // 2)
 
         if cantidad <= 0:
@@ -230,6 +228,13 @@ class EscenaJuego(Escena):
         self.rects_enemigo = [(idx_real, pygame.Rect(0, 0, 0, 0))
                               for idx_real, _ in vivas_e]
         self.rects_cartas_rival_clickeables = self._calcular_posiciones_rival(len(vivas_e))
+
+        # Si el foco se fue de rango (ej. por usar una carta), lo reseteamos
+        if len(self.rects_jugador) > 0:
+            if self.foco_teclado >= len(self.rects_jugador):
+                self.foco_teclado = len(self.rects_jugador) - 1
+        else:
+            self.foco_teclado = 0
 
     def _actualizar_emotes(self):
         self.quien_recibio_dano = None
@@ -308,6 +313,39 @@ class EscenaJuego(Escena):
             return None
         return self.mensaje_hechizo_temporal
 
+    def _usar_carta_con_teclado(self):
+        if not self.rects_jugador:
+            return
+
+        idx, rect = self.rects_jugador[self.foco_teclado]
+        carta = self.juego.mazo_jugador[idx]
+
+        if self.juego.turno == Turno.JUGADOR_TIRA:
+            if getattr(carta, "tipo", "criatura") == "criatura":
+                self.juego.jugador_tira_carta(idx)
+                self.tiempo_fase = pygame.time.get_ticks()
+            return
+
+        if self.juego.turno == Turno.JUGADOR_HECHIZOS:
+            if self.hechizo_seleccionado is not None:
+                # Si ya hay un hechizo seleccionado y apretas Enter, usa el slot 0
+                carta_sel = self.juego.mazo_jugador[self.hechizo_seleccionado]
+                data = HECHIZOS.get(carta_sel.hechizo_id, {})
+                if data.get("target") == "carta_rival":
+                    self._aplicar_hechizo_con_target(self.hechizo_seleccionado, 0)
+                else:
+                    self._aplicar_hechizo_directo(self.hechizo_seleccionado)
+                return
+
+            if getattr(carta, "tipo", "criatura") == "hechizo":
+                data = HECHIZOS.get(carta.hechizo_id, {})
+                target = data.get("target", "")
+                if target == "carta_rival":
+                    self.hechizo_seleccionado = idx
+                else:
+                    self._aplicar_hechizo_directo(idx)
+            return
+
     def handle_event(self, evento, mouse):
         self.mouse = mouse
 
@@ -318,15 +356,30 @@ class EscenaJuego(Escena):
                 return
             if evento.key == pygame.K_r:
                 self.nueva_partida()
+                return
 
             if evento.key in (pygame.K_LSHIFT, pygame.K_RSHIFT):
                 self.hechizo_seleccionado = None
                 return
 
+            # Navegacion con teclado (izq/der)
+            if evento.key in (pygame.K_a, pygame.K_LEFT):
+                if self.rects_jugador:
+                    self.foco_teclado = (self.foco_teclado - 1) % len(self.rects_jugador)
+                return
+            elif evento.key in (pygame.K_d, pygame.K_RIGHT):
+                if self.rects_jugador:
+                    self.foco_teclado = (self.foco_teclado + 1) % len(self.rects_jugador)
+                return
+
+            # Accion con teclado (Space, Enter, Z)
             if evento.key in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_z):
                 if self.juego.turno == Turno.RESULTADO:
                     self.juego.siguiente_ronda()
                     self.tiempo_fase = pygame.time.get_ticks()
+                    return
+                if self.juego.turno in (Turno.JUGADOR_TIRA, Turno.JUGADOR_HECHIZOS):
+                    self._usar_carta_con_teclado()
                     return
 
         if evento.type == pygame.MOUSEBUTTONDOWN:
@@ -426,6 +479,7 @@ class EscenaJuego(Escena):
             mensaje_hechizo=self._mensaje_hechizo_visible(),
             carta_vision_idx=self.juego.carta_vision_idx,
             vision_activa_hasta=self.juego.vision_activa_hasta,
+            foco_teclado=self.foco_teclado,
         )
 
     def _emote_rival(self):

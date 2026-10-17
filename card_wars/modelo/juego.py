@@ -4,6 +4,7 @@ import pygame
 from config import (
     Turno, HECHIZOS,
     MANA_INICIAL, MANA_MAXIMO, MANA_SUMA_MIN, MANA_SUMA_MAX,
+    TUTORIAL_ROUNDS,
 )
 from modelo.mazo import Mazo
 from modelo.carta import Carta
@@ -35,6 +36,39 @@ class Juego:
         self.carta_vision_idx = None
         self.vision_activa_hasta = 0
 
+        if getattr(self.dificultad, "es_tutorial", False):
+            self._forzar_mazo_tutorial()
+
+    def _forzar_mazo_tutorial(self):
+        """Reemplaza los mazos por los del tutorial segun la ronda."""
+        if self.ronda == 1:
+            self.mazo_jugador.cartas = [
+                Carta("Perro", 10, tipo="criatura"),
+                Carta("Slime", 5, tipo="criatura"),
+                Carta("Gato", 5, tipo="criatura"),
+            ]
+            self.mazo_enemigo.cartas = [
+                Carta("Gato", 5, tipo="criatura"),
+            ]
+        elif self.ronda == 2:
+            self.mazo_jugador.cartas = [
+                Carta("Dragon", 15, tipo="criatura"),
+                Carta("Vision", 0, tipo="hechizo", hechizo_id="vision", costo_mana=1),
+                Carta("Robo", 0, tipo="hechizo", hechizo_id="robo", costo_mana=3),
+            ]
+            self.mazo_enemigo.cartas = [
+                Carta("Perro", 10, tipo="criatura"),
+            ]
+        elif self.ronda == 3:
+            self.mazo_jugador.cartas = [
+                Carta("Fenix", 20, tipo="criatura"),
+                Carta("Golem", 25, tipo="criatura"),
+                Carta("Titan", 20, tipo="criatura"),
+            ]
+            self.mazo_enemigo.cartas = [
+                Carta("Dragon", 15, tipo="criatura"),
+            ]
+
     # ---------- Mana ----------
     def sumar_mana(self):
         suma_j = random.randint(MANA_SUMA_MIN, MANA_SUMA_MAX)
@@ -58,25 +92,20 @@ class Juego:
         if self.turno != Turno.IA_TIRA:
             return
 
-        # Intentar elegir una carta
         carta_e, idx_e = self.estrategia.elegir(
             self.mazo_enemigo, self.mazo_jugador,
             self.hp_enemigo, self.hp_jugador,
         )
 
-        # Si no puede tirar, verificar por que
         if carta_e is None:
-            # Forzar rebaraje si solo tiene hechizos o esta vacio
             if not self.mazo_enemigo.hay_vivas() or not self.mazo_enemigo.tiene_criaturas_vivas():
                 self.mazo_enemigo.barajar()
-                
-                # Volver a intentar elegir con las cartas nuevas
+
                 carta_e, idx_e = self.estrategia.elegir(
                     self.mazo_enemigo, self.mazo_jugador,
                     self.hp_enemigo, self.hp_jugador,
                 )
 
-        # Si sigue sin poder tirar, terminar
         if carta_e is None:
             self.chequear_fin()
             return
@@ -84,7 +113,7 @@ class Juego:
         self.carta_jugada_enemigo = idx_e
         self.turno = Turno.JUGADOR_TIRA
         self.mensaje = "zz Tu turno: elegi una criatura para bajar"
-        
+
     # ---------- Fase: jugador tira ----------
     def jugador_tira_carta(self, idx):
         if self.turno != Turno.JUGADOR_TIRA:
@@ -227,26 +256,20 @@ class Juego:
         if self.carta_jugada_jugador is None or self.carta_jugada_enemigo is None:
             return False
 
-        # Validar que los indices sigan siendo validos
         if (self.carta_jugada_jugador >= len(self.mazo_jugador.cartas)
                 or self.carta_jugada_enemigo >= len(self.mazo_enemigo.cartas)):
-            # Algun indice quedo fuera de rango (pasa si un hechizo
-            # elimino la criatura rival y se reacomodo el mazo)
             self.chequear_fin()
             return False
 
         carta_j = self.mazo_jugador[self.carta_jugada_jugador]
         carta_e = self.mazo_enemigo[self.carta_jugada_enemigo]
 
-        # Si la criatura rival ya murio (por Rayo/Drenaje), no hay duelo
         if not carta_e.viva:
             self.mensaje = "zz La criatura rival ya fue derrotada"
             self.turno = Turno.RESULTADO
             self.chequear_fin()
             return True
 
-        # Si la criatura del jugador ya murio (por algun buff raro),
-        # tampoco hay duelo
         if not carta_j.viva:
             self.mensaje = "zz Tu criatura ya no esta en la mesa"
             self.turno = Turno.RESULTADO
@@ -326,13 +349,23 @@ class Juego:
     def siguiente_ronda(self):
         if self.turno == Turno.FIN:
             return
+
+        es_tutorial = getattr(self.dificultad, "es_tutorial", False)
+
+        if es_tutorial and self.ronda >= TUTORIAL_ROUNDS:
+            self.turno = Turno.FIN
+            return
+
         self.ronda += 1
         self.carta_jugada_jugador = None
         self.carta_jugada_enemigo = None
         self.mensaje_hechizo = ""
 
-        self.mazo_jugador.rebarajar_si_hace_falta(self.hp_jugador)
-        self.mazo_enemigo.rebarajar_si_hace_falta(self.hp_enemigo)
+        if es_tutorial:
+            self._forzar_mazo_tutorial()
+        else:
+            self.mazo_jugador.rebarajar_si_hace_falta(self.hp_jugador)
+            self.mazo_enemigo.rebarajar_si_hace_falta(self.hp_enemigo)
 
         self.sumar_mana()
 

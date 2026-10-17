@@ -51,16 +51,17 @@ class EscenaDificultad(Escena):
 
         e = ESCALA_PIXEL
 
-        w = Botones.DIFICULTAD_W * e
-        h = Botones.DIFICULTAD_H * e
-        sep = Botones.DIFICULTAD_ESPACIO_Y * e
+        # Usamos las mismas medidas que el menu
+        w = Botones.MENU_W * e
+        h = Botones.MENU_H * e
+        sep = Botones.MENU_ESPACIO_Y * e
         margen_x = Botones.MENU_X_MARGEN * e
         margen_y = Botones.MENU_Y_MARGEN * e
 
-        claves = ["facil", "normal", "duro"]
-        textos = ["FACIL", "NORMAL", "DURO DE COJONES"]
+        claves = ["tutorial", "facil", "normal", "duro"]
         n = len(claves)
 
+        # La misma logica exacta que menu.py
         y_ultimo = ALTO - margen_y - h
 
         self.botones = []
@@ -70,7 +71,6 @@ class EscenaDificultad(Escena):
             rect = pygame.Rect(x_px, y_px, w, h)
             cfg = DIFICULTADES[claves[i]]
             self.botones.append((claves[i], cfg.nombre, rect))
-
 
         self.hover = None
         self.indice = 0
@@ -122,7 +122,10 @@ class EscenaDificultad(Escena):
                     break
 
     def _accion(self, clave):
-        if clave == "volver":
+        if clave == "tutorial":
+            from escenas.tutorial import EscenaTutorial
+            self.app.cambiar_escena(EscenaTutorial(self.app))
+        elif clave == "volver":
             from escenas.menu import EscenaMenu
             self.app.cambiar_escena(EscenaMenu(self.app))
         else:
@@ -195,10 +198,6 @@ class EscenaDificultad(Escena):
             "DIFICULTAD", self.fuentes["grande"], AMARILLO,
             x_texto, 14
         )
-        self.render._texto_mundo(
-            "Elegi el nivel", self.fuentes["normal"], BLANCO,
-            x_texto, 45
-        )
 
         # --- Botones flotantes (mismo estilo que menu) ---
         for i, (clave, texto, rect) in enumerate(self.botones):
@@ -225,7 +224,7 @@ class EscenaDificultad(Escena):
             self.render.ui.blit(surf, (x, y))
 
             # Asterisco en la dificultad actual
-            if actual and clave != "volver":
+            if actual and clave != "volver" and clave != "tutorial":
                 self.render._texto_centrado_ui(
                     "*", self.fuentes["mini"], AMARILLO,
                     rect.x + 6, cy - 6
@@ -243,9 +242,7 @@ class EscenaDificultad(Escena):
                         (x_sub, y_sub, ancho_actual, 3)
                     )
 
-
     def update(self, dt):
-        # ESTA es la linea que faltaba: incrementa el tiempo compartido
         self.app.tiempo_fondo += dt
 
         if self.indice != self.indice_anterior:
