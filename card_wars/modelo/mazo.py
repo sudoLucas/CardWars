@@ -1,20 +1,60 @@
 # modelo/mazo.py
 import random
-from config import POOL_CARTAS
+from config import POOL_CARTAS, POOL_HECHIZOS, HECHIZOS
 from modelo.carta import Carta
 
 
 class Mazo:
-    def __init__(self, tamano, pool=None):
+    def __init__(self, tamano, cartas_iniciales=None):
         self.tamano = tamano
-        self.pool = pool or POOL_CARTAS
         self.cartas = []
         self.rebarajes = 0
-        self.barajar()
+
+        if cartas_iniciales is not None:
+            self.cartas = cartas_iniciales
+        else:
+            self.barajar_inicial()
+
+    def _reparto(self):
+        if self.tamano <= 3:
+            return 1, 2
+        elif self.tamano == 4:
+            return 2, 2
+        else:
+            return 3, 3
+
+    def _crear_criaturas(self, cantidad):
+        pool = random.sample(POOL_CARTAS, min(cantidad, len(POOL_CARTAS)))
+        return [Carta(n, p, tipo="criatura") for n, p in pool]
+
+    def _crear_hechizos(self, cantidad):
+        ids = random.sample(POOL_HECHIZOS, min(cantidad, len(POOL_HECHIZOS)))
+        cartas = []
+        for hid in ids:
+            data = HECHIZOS[hid]
+            cartas.append(Carta(
+                nombre=data["nombre"],
+                poder=0,
+                tipo="hechizo",
+                hechizo_id=hid,
+                costo_mana=data["costo"],
+            ))
+        return cartas
+
+    def barajar_inicial(self):
+        cant_cri, cant_hec = self._reparto()
+        self.cartas = []
+        self.cartas.extend(self._crear_criaturas(cant_cri))
+        self.cartas.extend(self._crear_hechizos(cant_hec))
+        random.shuffle(self.cartas)
 
     def barajar(self):
-        elegidas = random.sample(self.pool, self.tamano)
-        self.cartas = [Carta(n, p) for n, p in elegidas]
+        cant_cri, cant_hec = self._reparto()
+        self.cartas = []
+        self.cartas.extend(self._crear_criaturas(cant_cri))
+        self.cartas.extend(self._crear_hechizos(cant_hec))
+        random.shuffle(self.cartas)
+        self.rebarajes += 1
 
     def vivas(self):
         return [c for c in self.cartas if c.viva]
@@ -23,10 +63,8 @@ class Mazo:
         return any(c.viva for c in self.cartas)
 
     def rebarajar_si_hace_falta(self, hp_dueno):
-        """Si no quedan vivas y el dueno sigue con HP, baraja nuevas cartas."""
         if not self.hay_vivas() and hp_dueno > 0:
             self.barajar()
-            self.rebarajes += 1
             return True
         return False
 

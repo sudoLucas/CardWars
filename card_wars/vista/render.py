@@ -2,7 +2,7 @@
 import math
 import pygame
 
-from config import ANCHO, ALTO, Layout, Botones, Turno, ESCALA_PIXEL
+from config import ANCHO, ALTO, Layout, Botones, Turno, ESCALA_PIXEL, HECHIZOS
 from vista.colores import (
     NEGRO, BLANCO, AMARILLO, ROJO, GRIS_OSCURO,
     COLOR_JUGADOR, COLOR_JUGADOR_HOVER, COLOR_ENEMIGO,
@@ -19,14 +19,14 @@ OLA_VELOCIDAD  = 0.006
 
 PAD_ROTACION = 12
 
-# --- Escala de las cartas del rival ---
 ESCALA_CARTA_RIVAL = 0.75
-
-# --- Margen entre el canto y la imagen del reverso ---
 MARGEN_INTERNO_REVERSO = 5
-
-# --- Grosor del canto de las cartas ---
 GROSOR_PX = 2
+
+COLOR_HECHIZO_BRILLO = (180, 130, 255)
+
+HOVER_LEVANTAR = 14
+HOVER_ESCALA = 1.06
 
 
 class Render:
@@ -36,9 +36,13 @@ class Render:
         self.f = fuentes
         self.tiempo = 0.0
         self.e = ESCALA_PIXEL
+        self.tiempo_turno_ms = 0
 
     def tick(self, dt):
         self.tiempo += dt
+
+    def marcar_turno_visible(self):
+        self.tiempo_turno_ms = pygame.time.get_ticks()
 
     # ==================================================
     # TEXTO
@@ -91,25 +95,18 @@ class Render:
         surf = pygame.Surface((w_pad, h_pad), pygame.SRCALPHA)
         ox, oy = PAD_ROTACION, PAD_ROTACION
 
-        # ================================================
-        # EFECTO 3D
-        # ================================================
         t = self.tiempo * 0.0015 + indice * 0.6
 
         escala_3d_x = 0.95 + 0.05 * math.sin(t * 1.3)
         escala_3d_y = 0.97 + 0.03 * math.cos(t * 1.7)
         inclinacion = math.sin(t * 0.9) * 2
 
-        # Tamano del marco (canto)
         w_canto = int(w * escala_3d_x * ESCALA_CARTA_RIVAL)
         h_canto = int(h * escala_3d_y * ESCALA_CARTA_RIVAL)
 
         offset_x_canto = (w - w_canto) // 2
         offset_y_canto = (h - h_canto) // 2
 
-        # ================================================
-        # CANTO (grosor negro, capas detras)
-        # ================================================
         for offset_grosor in range(GROSOR_PX, 0, -1):
             canto_color = (15, 10, 15)
             offset_skew = int(inclinacion * offset_grosor / GROSOR_PX)
@@ -121,9 +118,6 @@ class Render:
             )
             pygame.draw.rect(surf, canto_color, rect_canto)
 
-        # ================================================
-        # REVERSO ACHICADO DENTRO DEL CANTO
-        # ================================================
         w_reverso = w_canto - MARGEN_INTERNO_REVERSO * 2
         h_reverso = h_canto - MARGEN_INTERNO_REVERSO * 2
 
@@ -185,9 +179,6 @@ class Render:
                                     [(cx, cy - tam_y + 1), (cx + tam_x - 1, cy),
                                      (cx, cy + tam_y - 1), (cx - tam_x + 1, cy)], 1)
 
-        # ================================================
-        # BRILLO SUPERIOR
-        # ================================================
         offset_skew = int(inclinacion)
         brillo_color = (120, 100, 130)
         pygame.draw.line(
@@ -200,7 +191,137 @@ class Render:
         return surf
 
     # ==================================================
-    # CARTA DEL JUGADOR (con 3D, grosor y vida)
+    # CARTA DEL JUGADOR EN EL ABANICO (rotada + hover)
+    # ==================================================
+    def _dibujar_carta_abanico(self, cx_m, cy_m, carta, angulo, hover=False):
+        w, h = Layout.CARTA_W, Layout.CARTA_H
+        e = self.e
+        factor = 2   # achicar el texto a la mitad (no a un cuarto)
+
+        if hover:
+            escala = HOVER_ESCALA
+            w_draw = int(w * escala)
+            h_draw = int(h * escala)
+        else:
+            w_draw = w
+            h_draw = h
+
+        surf = pygame.Surface(
+            (w_draw + PAD_ROTACION * 2, h_draw + PAD_ROTACION * 2),
+            pygame.SRCALPHA,
+        )
+        ox = PAD_ROTACION
+        oy = PAD_ROTACION
+
+        if not carta.viva:
+            color = COLOR_MUERTA
+        elif hover:
+            color = COLOR_JUGADOR_HOVER
+        else:
+            color = COLOR_JUGADOR
+
+        es_hechizo = (getattr(carta, "tipo", "criatura") == "hechizo")
+
+        rect = pygame.Rect(ox, oy, w_draw, h_draw)
+        pygame.draw.rect(surf, color, rect)
+
+        if es_hechizo:
+            pygame.draw.rect(surf, COLOR_HECHIZO_BRILLO, rect, 2)
+        else:
+            pygame.draw.rect(surf, BLANCO, rect, 1)
+
+        brillo = (
+            min(255, color[0] + 60),
+            min(255, color[1] + 60),
+            min(255, color[2] + 60),
+        )
+        pygame.draw.line(surf, brillo,
+                         (ox + 1, oy + 1), (ox + w_draw - 2, oy + 1), 1)
+
+        sombra = (
+            max(0, color[0] - 50),
+            max(0, color[1] - 50),
+            max(0, color[2] - 50),
+        )
+        pygame.draw.line(surf, sombra,
+                         (ox + 1, oy + h_draw - 2),
+                         (ox + w_draw - 2, oy + h_draw - 2), 1)
+
+        if hover:
+            def _blit_texto_escalado(superficie, texto, fuente, color, x, y):
+                txt = fuente.render(texto, False, color)
+                tam = (
+                    max(1, txt.get_width() // factor),
+                    max(1, txt.get_height() // factor),
+                )
+                txt = pygame.transform.scale(txt, tam)
+                superficie.blit(txt, (x, y))
+                return txt.get_width(), txt.get_height()
+
+            ancho_nombre, _ = _blit_texto_escalado(
+                surf, carta.nombre[:10], self.f["mini"], BLANCO,
+                ox + 2, oy + 2,
+            )
+
+            if es_hechizo:
+                _blit_texto_escalado(
+                    surf, "HECHIZO", self.f["mini"], COLOR_HECHIZO_BRILLO,
+                    ox + w_draw // 2 - 20, oy + 20,
+                )
+                _blit_texto_escalado(
+                    surf, f"{carta.costo_mana} mana", self.f["mini"], AMARILLO,
+                    ox + w_draw // 2 - 20, oy + 36,
+                )
+            else:
+                poder_txt = str(carta.poder) if carta.viva else "0"
+                poder_color = AMARILLO if carta.viva else GRIS_OSCURO
+                poder_surf = self.f["chica"].render(poder_txt, False, poder_color)
+                tam_p = (
+                    max(1, poder_surf.get_width() // factor),
+                    max(1, poder_surf.get_height() // factor),
+                )
+                poder_surf = pygame.transform.scale(poder_surf, tam_p)
+                surf.blit(poder_surf,
+                          (ox + w_draw // 2 - poder_surf.get_width() // 2, oy + 20))
+
+                lbl = "PODER"
+                _blit_texto_escalado(
+                    surf, lbl, self.f["mini"], BLANCO,
+                    ox + w_draw // 2 - 18, oy + 40,
+                )
+
+                if carta.viva:
+                    max_ag = getattr(carta, "poder_original", carta.poder)
+                    ancho_max = w_draw - 6
+                    ancho_actual = int(ancho_max * carta.aguante / max_ag) if max_ag > 0 else 0
+                    barra_y = oy + h_draw - 8
+                    pygame.draw.rect(surf, COLOR_FONDO_BARRA,
+                                     (ox + 3, barra_y, ancho_max, 2))
+                    pygame.draw.rect(surf, COLOR_AGUANTE,
+                                     (ox + 3, barra_y, ancho_actual, 2))
+
+                    txt_ag = f"{carta.aguante}/{max_ag}"
+                    ag_surf = self.f["mini"].render(txt_ag, False, COLOR_AGUANTE)
+                    tam_ag = (
+                        max(1, ag_surf.get_width() // factor),
+                        max(1, ag_surf.get_height() // factor),
+                    )
+                    ag_surf = pygame.transform.scale(ag_surf, tam_ag)
+                    surf.blit(ag_surf,
+                              (ox + w_draw // 2 - ag_surf.get_width() // 2,
+                               oy + h_draw - 16))
+                else:
+                    cxm = ox + w_draw // 2
+                    cym = oy + h_draw // 2
+                    pygame.draw.line(surf, ROJO, (cxm - 5, cym - 5), (cxm + 5, cym + 5), 1)
+                    pygame.draw.line(surf, ROJO, (cxm + 5, cym - 5), (cxm - 5, cym + 5), 1)
+
+        rotada = pygame.transform.rotate(surf, angulo)
+        rect_final = rotada.get_rect(center=(cx_m, cy_m))
+        self.mundo.blit(rotada, rect_final)
+
+    # ==================================================
+    # CARTA SUELTA (sigue existiendo para la zona de duelo)
     # ==================================================
     def dibujar_carta(self, x_m, y_m, carta, color_fondo,
                       hover=False, resaltada=False, ola=False,
@@ -210,21 +331,12 @@ class Render:
         if ola:
             y_m = y_m + self._offset_ola(x_m)
 
-        # ================================================
-        # EFECTO 3D EN CARTAS DEL JUGADOR
-        # ================================================
-        # Vaiven vertical extra
         offset_y_flote = math.sin(self.tiempo * 0.003 + x_m * 0.08) * 2
         y_m += offset_y_flote
 
-        # Compresion horizontal (rotacion eje Y)
         t = self.tiempo * 0.0015 + x_m * 0.05
         escala_3d_x = 0.96 + 0.04 * math.sin(t * 1.3)
-
-        # Compresion vertical (rotacion eje X)
         escala_3d_y = 0.97 + 0.03 * math.cos(t * 1.7)
-
-        # Inclinacion (skew)
         inclinacion = math.sin(t * 0.9) * 4
 
         w_3d = int(w * escala_3d_x)
@@ -232,6 +344,8 @@ class Render:
 
         x_i = int(round(x_m + (w - w_3d) / 2))
         y_i = int(round(y_m + (h - h_3d) / 2))
+
+        es_hechizo = (getattr(carta, "tipo", "criatura") == "hechizo")
 
         if not carta.viva:
             color = COLOR_MUERTA
@@ -242,9 +356,6 @@ class Render:
         else:
             color = color_fondo
 
-        # ================================================
-        # CANTO (grosor falso detras)
-        # ================================================
         for offset_grosor in range(GROSOR_PX, 0, -1):
             canto_color = (
                 max(0, color[0] - 60 - offset_grosor * 15),
@@ -260,21 +371,18 @@ class Render:
             )
             pygame.draw.rect(self.mundo, canto_color, rect_canto)
 
-        # ================================================
-        # CUERPO DE LA CARTA
-        # ================================================
         offset_skew = int(inclinacion)
         rect_m = pygame.Rect(x_i + offset_skew, y_i, w_3d, h_3d)
         pygame.draw.rect(self.mundo, color, rect_m)
 
-        # Borde
         if destacada:
             pygame.draw.rect(self.mundo, AMARILLO, rect_m, 2)
+        elif es_hechizo:
+            pygame.draw.rect(self.mundo, COLOR_HECHIZO_BRILLO, rect_m, 2)
         else:
             borde = AMARILLO if resaltada else BLANCO
             pygame.draw.rect(self.mundo, borde, rect_m, 1)
 
-        # Brillo superior
         brillo_color = (
             min(255, color[0] + 60),
             min(255, color[1] + 60),
@@ -286,7 +394,6 @@ class Render:
             (rect_m.x + w_3d - 2, rect_m.y + 1), 1
         )
 
-        # Sombra inferior
         sombra_color = (
             max(0, color[0] - 50),
             max(0, color[1] - 50),
@@ -298,44 +405,79 @@ class Render:
             (rect_m.x + w_3d - 2, rect_m.y + h_3d - 2), 1
         )
 
-        # ================================================
-        # TEXTO
-        # ================================================
-        self._texto_mundo(carta.nombre[:8], self.f["mini"], BLANCO,
+        self._texto_mundo(carta.nombre[:10], self.f["mini"], BLANCO,
                           rect_m.x + 2, rect_m.y + 2)
 
-        poder_txt = str(carta.poder) if carta.viva else "0"
-        poder_color = AMARILLO if carta.viva else GRIS_OSCURO
-        cx = rect_m.x + w_3d // 2
-        self._texto_centrado_mundo(poder_txt, self.f["chica"], poder_color,
-                                   cx, rect_m.y + 12)
-        self._texto_centrado_mundo("PODER", self.f["mini"], BLANCO,
-                                   cx, rect_m.y + 26)
-
-        if carta.viva:
-            max_ag = carta.poder
-            ancho_max = w_3d - 6
-            ancho_actual = int(ancho_max * carta.aguante / max_ag) if max_ag > 0 else 0
-            barra_y = rect_m.y + h_3d - 5
-            pygame.draw.rect(self.mundo, COLOR_FONDO_BARRA,
-                             (rect_m.x + 3, barra_y, ancho_max, 2))
-            pygame.draw.rect(self.mundo, COLOR_AGUANTE,
-                             (rect_m.x + 3, barra_y, ancho_actual, 2))
-
-            txt_ag = f"R {carta.aguante}/{max_ag}"
-            surf = self.f["mini"].render(txt_ag, False, COLOR_AGUANTE)
-            sombra = self.f["mini"].render(txt_ag, False, NEGRO)
-            x_txt = rect_m.x * self.e + w_3d * self.e - surf.get_width() - 2
-            y_txt = rect_m.y * self.e + h_3d * self.e - surf.get_height() - 6
-            self.ui.blit(sombra, (x_txt + 1, y_txt + 1))
-            self.ui.blit(surf, (x_txt, y_txt))
+        if es_hechizo:
+            cx = rect_m.x + w_3d // 2
+            self._texto_centrado_mundo("HECHIZO", self.f["mini"],
+                                       COLOR_HECHIZO_BRILLO,
+                                       cx, rect_m.y + 20)
+            self._texto_centrado_mundo(f"{carta.costo_mana} mana",
+                                       self.f["mini"], AMARILLO,
+                                       cx, rect_m.y + 34)
         else:
-            cxm = rect_m.x + w_3d // 2
-            cym = rect_m.y + h_3d // 2
-            pygame.draw.line(self.mundo, ROJO, (cxm - 5, cym - 5), (cxm + 5, cym + 5), 1)
-            pygame.draw.line(self.mundo, ROJO, (cxm + 5, cym - 5), (cxm - 5, cym + 5), 1)
+            poder_txt = str(carta.poder) if carta.viva else "0"
+            poder_color = AMARILLO if carta.viva else GRIS_OSCURO
+            cx = rect_m.x + w_3d // 2
+            self._texto_centrado_mundo(poder_txt, self.f["chica"], poder_color,
+                                       cx, rect_m.y + 12)
+            self._texto_centrado_mundo("PODER", self.f["mini"], BLANCO,
+                                       cx, rect_m.y + 26)
+
+            if carta.viva:
+                max_ag = getattr(carta, "poder_original", carta.poder)
+                ancho_max = w_3d - 6
+                ancho_actual = int(ancho_max * carta.aguante / max_ag) if max_ag > 0 else 0
+                barra_y = rect_m.y + h_3d - 5
+                pygame.draw.rect(self.mundo, COLOR_FONDO_BARRA,
+                                 (rect_m.x + 3, barra_y, ancho_max, 2))
+                pygame.draw.rect(self.mundo, COLOR_AGUANTE,
+                                 (rect_m.x + 3, barra_y, ancho_actual, 2))
+
+                txt_ag = f"R {carta.aguante}/{max_ag}"
+                surf = self.f["mini"].render(txt_ag, False, COLOR_AGUANTE)
+                sombra = self.f["mini"].render(txt_ag, False, NEGRO)
+                x_txt = rect_m.x * self.e + w_3d * self.e - surf.get_width() - 2
+                y_txt = rect_m.y * self.e + h_3d * self.e - surf.get_height() - 6
+                self.ui.blit(sombra, (x_txt + 1, y_txt + 1))
+                self.ui.blit(surf, (x_txt, y_txt))
+            else:
+                cxm = rect_m.x + w_3d // 2
+                cym = rect_m.y + h_3d // 2
+                pygame.draw.line(self.mundo, ROJO, (cxm - 5, cym - 5), (cxm + 5, cym + 5), 1)
+                pygame.draw.line(self.mundo, ROJO, (cxm + 5, cym - 5), (cxm - 5, cym + 5), 1)
 
         return rect_m
+
+    # ==================================================
+    # TOOLTIP
+    # ==================================================
+    def dibujar_tooltip(self, carta, x, y):
+        es_hechizo = (getattr(carta, "tipo", "criatura") == "hechizo")
+
+        if es_hechizo:
+            data = HECHIZOS.get(carta.hechizo_id, {})
+            lineas = [
+                f"{data.get('nombre', carta.nombre)}",
+                data.get("descripcion", ""),
+            ]
+        else:
+            lineas = [
+                f"{carta.nombre}",
+                f"{carta.poder} dano",
+                f"{carta.aguante} vida",
+            ]
+
+        ancho = 180
+        alto = 12 + len(lineas) * 20
+        rect = pygame.Rect(x, y - alto - 6, ancho, alto)
+        pygame.draw.rect(self.ui, (20, 20, 30, 230), rect)
+        pygame.draw.rect(self.ui, BLANCO, rect, 1)
+
+        for i, linea in enumerate(lineas):
+            self._texto_ui(linea, self.f["mini"], BLANCO,
+                           x + 8, y - alto - 6 + 6 + i * 20)
 
     def dibujar_carta_rotada(self, cx_m, cy_m, surf, angulo):
         rotacion_extra = math.sin(self.tiempo * 0.0018 + cx_m * 0.04) * 4
@@ -433,6 +575,46 @@ class Render:
         self.ui.blit(capa, (x, y))
 
     # ==================================================
+    # MANA (frasco estilo pocion, dibujado)
+    # ==================================================
+    def dibujar_mana(self, x_m, y_m, mana, mana_max):
+        w_m = 22
+        h_m = 28
+
+        pygame.draw.rect(self.mundo, (150, 120, 200),
+                         (x_m + 4, y_m - 4, w_m - 8, 6))
+
+        pygame.draw.rect(self.mundo, (80, 80, 110),
+                         (x_m + 8, y_m + 2, w_m - 16, 6))
+
+        cuerpo_rect = pygame.Rect(x_m, y_m + 8, w_m, h_m - 8)
+        pygame.draw.ellipse(self.mundo, (30, 40, 90), cuerpo_rect)
+
+        nivel = max(0, min(1, mana / mana_max)) if mana_max > 0 else 0
+        alto_total = h_m - 10
+        alto_llenado = int(alto_total * nivel)
+        if alto_llenado > 0:
+            llenado_rect = pygame.Rect(
+                x_m + 2,
+                y_m + 8 + (alto_total - alto_llenado) + 2,
+                w_m - 4,
+                alto_llenado,
+            )
+            pygame.draw.ellipse(self.mundo, (90, 160, 255), llenado_rect)
+
+        pygame.draw.ellipse(self.mundo, (200, 220, 255),
+                            (x_m + 4, y_m + 12, 4, 8))
+
+        pygame.draw.ellipse(self.mundo, BLANCO, cuerpo_rect, 1)
+
+        self._texto_centrado_mundo(str(mana), self.f["chica"], BLANCO,
+                                   x_m + w_m // 2, y_m + 12)
+
+        self._texto_ui(f"/{mana_max}", self.f["mini"], (180, 180, 200),
+                       int((x_m + w_m + 4) * self.e),
+                       int((y_m + 14) * self.e))
+
+    # ==================================================
     # BOTON
     # ==================================================
     def dibujar_boton(self, rect, texto, hover, color_on, color_off,
@@ -469,10 +651,10 @@ class Render:
                        btn_reiniciar, btn_siguiente,
                        emote_rival=None, emote_jugador=None,
                        emote_activo=False, quien_recibio_dano=None,
-                       hp_img=None, mesa_img=None, reversos_img=None):
+                       hp_img=None, mesa_img=None, reversos_img=None,
+                       posiciones_jugador=None):
         self.mundo.fill(COLOR_FONDO_BARRA)
 
-        # --- Mesa centrada (detras de todo) ---
         if mesa_img is not None:
             MESA_ANCHO = 700
             MESA_ALTO = 500
@@ -497,9 +679,9 @@ class Render:
             )
 
             RIVAL_X_BASE = 10
-            RIVAL_Y_BASE = 4
+            RIVAL_Y_BASE = 30
             JUGADOR_X_MARGEN_DER = 10
-            JUGADOR_Y_BASE = 30
+            JUGADOR_Y_BASE = 70
 
             AMPLITUD_X = 4
             AMPLITUD_Y = 4
@@ -514,18 +696,12 @@ class Render:
             self.dibujar_barra_hp(rival_x, rival_y,
                                   juego.hp_enemigo, juego.hp_enemigo_max,
                                   hp_img_chica, (220, 40, 40))
-            self._texto_ui(f"RIVAL: {max(0, juego.hp_enemigo)}",
-                           self.f["mini"], BLANCO,
-                           rival_x, rival_y + alto_hp + 4)
 
             jugador_x = ANCHO - ancho_hp - JUGADOR_X_MARGEN_DER + off_x
             jugador_y = JUGADOR_Y_BASE + off_y
             self.dibujar_barra_hp(jugador_x, jugador_y,
                                   juego.hp_jugador, juego.hp_jugador_max,
                                   hp_img_chica, (0, 144, 248))
-            self._texto_ui(f"TU: {max(0, juego.hp_jugador)}",
-                           self.f["mini"], BLANCO,
-                           jugador_x, jugador_y + alto_hp + 4)
         else:
             hp_w = 70
             hp_h = 8
@@ -534,6 +710,10 @@ class Render:
             self.dibujar_hp(ancho_m - hp_w - 3, 3,
                             juego.hp_jugador, juego.hp_jugador_max,
                             "TU", (0, 144, 248), hp_w, hp_h)
+
+        # --- Mana (abajo derecha) ---
+        mana_disponible = getattr(juego, "mana_jugador", 0)
+        self.dibujar_mana(ancho_m - 40, alto_m - 75, mana_disponible, 14)
 
         # --- Abanico del rival ---
         cantidad_e = len(rects_enemigo)
@@ -582,39 +762,85 @@ class Render:
 
         if juego.carta_jugada_jugador is not None:
             cj = juego.mazo_jugador[juego.carta_jugada_jugador]
-            x = cx_duelo - Layout.CARTA_W // 2
-            y = cy_duelo + Layout.DUELO_SEP_Y
-            self.dibujar_carta(x, y, cj, COLOR_JUGADOR, destacada=True)
+            if getattr(cj, "tipo", "criatura") == "criatura":
+                x = cx_duelo - Layout.CARTA_W // 2
+                y = cy_duelo + Layout.DUELO_SEP_Y
+                self.dibujar_carta(x, y, cj, COLOR_JUGADOR, destacada=True)
 
         if juego.carta_jugada_enemigo is not None or juego.carta_jugada_jugador is not None:
             self._texto_centrado_mundo("VS", self.f["chica"], AMARILLO,
                                        cx_duelo, Layout.Y_VS)
 
-        # --- Mano del jugador ---
-        for idx_real, rect in rects_jugador:
-            carta = juego.mazo_jugador.cartas[idx_real]
-            hover_j = rect.collidepoint(mouse) and juego.turno == Turno.JUGADOR
+        # --- Mano del jugador: abanico + tooltip + hover Balatro ---
+        carta_hover = None
+        rect_hover = None
 
-            x_m = rect.x // self.e
-            y_m = rect.y // self.e
-            self.dibujar_carta(x_m, y_m, carta, COLOR_JUGADOR,
-                               hover=hover_j, ola=True)
+        if posiciones_jugador is not None and len(posiciones_jugador) > 0 and len(posiciones_jugador) == len(rects_jugador):
+            cantidad = len(rects_jugador)
+            medio = (cantidad - 1) / 2.0
+
+            idx_hover = -1
+            for i, (idx_real, rect) in enumerate(rects_jugador):
+                if rect.collidepoint(mouse) and juego.turno == Turno.JUGADOR:
+                    idx_hover = i
+                    carta_hover = juego.mazo_jugador.cartas[idx_real]
+                    rect_hover = rect
+                    break
+
+            orden = sorted(range(cantidad),
+                           key=lambda i: abs(i - medio),
+                           reverse=True)
+
+            for i in orden:
+                idx_real, rect = rects_jugador[i]
+                carta = juego.mazo_jugador.cartas[idx_real]
+                cx, cy, angulo = posiciones_jugador[i]
+
+                if i == idx_hover:
+                    cy -= HOVER_LEVANTAR
+
+                self._dibujar_carta_abanico(
+                    cx, cy, carta, angulo,
+                    hover=(i == idx_hover),
+                )
+        else:
+            for idx_real, rect in rects_jugador:
+                carta = juego.mazo_jugador.cartas[idx_real]
+                hover_j = rect.collidepoint(mouse) and juego.turno == Turno.JUGADOR
+                if hover_j:
+                    carta_hover = carta
+                    rect_hover = rect
+
+                x_m = rect.x // self.e
+                y_m = rect.y // self.e
+                self.dibujar_carta(x_m, y_m, carta, COLOR_JUGADOR,
+                                   hover=hover_j, ola=True)
+
+        if carta_hover is not None and rect_hover is not None:
+            self.dibujar_tooltip(carta_hover, rect_hover.x, rect_hover.y)
 
         # --- Botones ---
-        hover_re = btn_reiniciar.collidepoint(mouse)
-        self.dibujar_boton(btn_reiniciar, "REINICIAR", hover_re,
-                           COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF)
+        if btn_reiniciar is not None:
+            hover_re = btn_reiniciar.collidepoint(mouse)
+            self.dibujar_boton(btn_reiniciar, "REINICIAR", hover_re,
+                               COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF)
 
-        if juego.turno == Turno.RESOLVIENDO:
+        if btn_siguiente is not None and juego.turno == Turno.RESOLVIENDO:
             hover_sig = btn_siguiente.collidepoint(mouse)
             self.dibujar_boton(btn_siguiente, "SIGUIENTE", hover_sig,
                                COLOR_BTN_VERDE, COLOR_BTN_VERDE_OFF)
 
         # --- Mensaje de estado ---
         if juego.turno == Turno.JUGADOR:
-            self._texto_centrado_mundo("TU TURNO", self.f["normal"],
-                                       AMARILLO, cx_duelo, Layout.Y_MENSAJE)
-        elif juego.turno == Turno.RESOLVIENDO:
+            if self.tiempo_turno_ms == 0:
+                self.marcar_turno_visible()
+            if pygame.time.get_ticks() - self.tiempo_turno_ms < 1000:
+                self._texto_centrado_mundo("TU TURNO", self.f["normal"],
+                                           AMARILLO, cx_duelo, Layout.Y_MENSAJE)
+        else:
+            self.tiempo_turno_ms = 0
+
+        if juego.turno == Turno.RESOLVIENDO:
             self._texto_centrado_mundo("COMBATE", self.f["normal"],
                                        (255, 160, 40), cx_duelo, Layout.Y_MENSAJE)
 

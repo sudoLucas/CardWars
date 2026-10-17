@@ -102,6 +102,11 @@ class Layout:
     ABANICO_OFFSET_Y = 12
     ABANICO_ANGULO = 8
 
+    # --- Abanico del jugador ---
+    ABANICO_SEP_X_JUGADOR = 48
+    ABANICO_OFFSET_Y_JUGADOR = 10
+    ABANICO_ANGULO_JUGADOR = 8
+
     # --- Zona de duelo ---
     Y_CENTRO_DUELO = 100
     Y_VS = 78
@@ -146,6 +151,80 @@ class Botones:
 
 
 # ============================================================
+# MANA
+# ============================================================
+MANA_INICIAL  = 7
+MANA_MAXIMO   = 14
+MANA_SUMA_MIN = 1
+MANA_SUMA_MAX = 2
+
+
+# ============================================================
+# HECHIZOS
+# ============================================================
+HECHIZOS = {
+    "vision": {
+        "nombre": "Vision",
+        "costo": 1,
+        "target": "carta_rival",
+        "descripcion": "Ver una carta del rival por 1.5s",
+    },
+    "fuerza": {
+        "nombre": "Pocion de fuerza",
+        "costo": 2,
+        "target": "criatura_propia",
+        "bonus_poder": 5,
+        "descripcion": "+5 poder a tu criatura este turno",
+    },
+    "defensa": {
+        "nombre": "Pocion de defensa",
+        "costo": 2,
+        "target": "criatura_propia",
+        "bonus_aguante": 5,
+        "descripcion": "+5 vida a tu criatura este turno",
+    },
+    "curacion": {
+        "nombre": "Curacion",
+        "costo": 3,
+        "target": "jugador",
+        "bonus_hp": 20,
+        "descripcion": "+20 HP al jugador",
+    },
+    "rayo": {
+        "nombre": "Rayo",
+        "costo": 3,
+        "target": "criatura_rival",
+        "daño": 10,
+        "descripcion": "10 de dano a una criatura rival",
+    },
+    "debilidad": {
+        "nombre": "Debilidad",
+        "costo": 3,
+        "target": "criatura_rival",
+        "bonus_poder": -5,
+        "descripcion": "-5 poder a una criatura rival este turno",
+    },
+    "robo": {
+        "nombre": "Robo",
+        "costo": 3,
+        "target": "carta_rival",
+        "descripcion": "Robar una carta del rival",
+    },
+    "inmovilizar": {
+        "nombre": "Inmovilizar",
+        "costo": 4,
+        "target": "criatura_rival",
+        "descripcion": "La criatura rival no ataca este turno",
+    },
+}
+
+POOL_HECHIZOS = [
+    "vision", "fuerza", "defensa", "curacion",
+    "rayo", "debilidad", "robo", "inmovilizar",
+]
+
+
+# ============================================================
 # DIFICULTAD
 # ============================================================
 @dataclass(frozen=True)
@@ -171,7 +250,7 @@ DIFICULTAD_NORMAL = ConfigDificultad(
     nombre        = "Normal",
     hp_jugador    = 250,
     hp_enemigo    = 250,
-    tamano_mazo   = 3,
+    tamano_mazo   = 4,
     estrategia_ia = "IAConservadora",
     descripcion   = "",
 )
@@ -180,7 +259,7 @@ DIFICULTAD_DURO = ConfigDificultad(
     nombre        = "Duro de cojones",
     hp_jugador    = 250,
     hp_enemigo    = 300,
-    tamano_mazo   = 4,
+    tamano_mazo   = 6,
     estrategia_ia = "IAAdaptativa",
     descripcion   = "",
 )

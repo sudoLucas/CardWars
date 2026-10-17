@@ -1,6 +1,7 @@
 # escenas/juego.py
 import os
 import random
+import math
 import pygame
 from config import (
     ANCHO, ALTO, Layout, Botones, Turno, ESCALA_PIXEL,
@@ -10,27 +11,20 @@ from escenas.base import Escena
 from modelo.juego import Juego
 
 
-# --- Carpeta de emotes ---
 CARPETA_EMOTES = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "emotes")
 
-# --- Imagen de la barra de HP ---
 RUTA_HP = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "HP.png")
 
-# --- Imagen de la mesa ---
 RUTA_MESA = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "mesa.png")
 
-# --- Carpeta de reversos de carta ---
 CARPETA_REVERSOS = os.path.join(
     DIRECTORIO_RAIZ, "assets", "imagenes", "Objetos", "cartas"
 )
 
-# --- Definicion de personajes ---
-# Cada personaje tiene 3 archivos: feliz (1), neutro (2), triste (3)
 PERSONAJES = ["Finn", "Arcoiris", "BMO", "Jake"]
 
 
 def rutas_personaje(nombre):
-    """Devuelve (neutro, feliz, triste) para un personaje."""
     return {
         "neutro": os.path.join(CARPETA_EMOTES, f"{nombre}2.png"),
         "feliz":  os.path.join(CARPETA_EMOTES, f"{nombre}1.png"),
@@ -38,7 +32,6 @@ def rutas_personaje(nombre):
     }
 
 
-# --- Duracion del emote de dano (ms) ---
 EMOTE_DURACION = 2500
 
 
@@ -69,45 +62,33 @@ class EscenaJuego(Escena):
         )
 
         self.rects_jugador = []
+        self.posiciones_jugador = []
         self.rects_enemigo = []
         self.mouse = (0, 0)
 
-        # --- Cargar barra de HP ---
         self.hp_img = self._cargar(RUTA_HP)
-
-        # --- Cargar mesa ---
         self.mesa_img = self._cargar(RUTA_MESA)
 
-        # --- Elegir personajes al azar ---
         self._elegir_personajes()
-
-        # --- Cargar emotes segun los personajes elegidos ---
         self._cargar_emotes()
-
-        # --- Elegir 3 reversos random (no repetidos) ---
         self._elegir_reversos()
 
-        # Estado actual: "neutro", "feliz" o "triste"
         self.emote_rival_actual = "neutro"
         self.emote_jugador_actual = "neutro"
         self.tiempo_emote = 0
 
-        # Quien recibio dano: "jugador", "rival", "empate" o None
         self.quien_recibio_dano = None
 
-        # Para detectar cambios de HP
         self.hp_jugador_anterior = self.juego.hp_jugador
         self.hp_enemigo_anterior = self.juego.hp_enemigo
         self.mensaje_anterior = self.juego.mensaje
 
     def _elegir_personajes(self):
-        """Elige un personaje random para el jugador y otro distinto para el rival."""
         self.personaje_jugador = random.choice(PERSONAJES)
         opciones_rival = [p for p in PERSONAJES if p != self.personaje_jugador]
         self.personaje_rival = random.choice(opciones_rival)
 
     def _cargar_emotes(self):
-        """Carga los emotes de ambos personajes."""
         rutas_j = rutas_personaje(self.personaje_jugador)
         rutas_r = rutas_personaje(self.personaje_rival)
 
@@ -120,7 +101,6 @@ class EscenaJuego(Escena):
         self.emote_rival_triste = self._cargar(rutas_r["triste"])
 
     def _elegir_reversos(self):
-        """Elige 3 reversos random distintos entre los 6 disponibles."""
         numeros = random.sample(range(1, 7), 3)
         self.reversos_img = []
         for n in numeros:
@@ -143,11 +123,8 @@ class EscenaJuego(Escena):
         self.juego = Juego(self.dificultad)
         self.tiempo_resolucion = 0
 
-        # Nuevos personajes random
         self._elegir_personajes()
         self._cargar_emotes()
-
-        # Nuevos reversos random
         self._elegir_reversos()
 
         self.hp_jugador_anterior = self.juego.hp_jugador
@@ -161,30 +138,66 @@ class EscenaJuego(Escena):
     def _ancho_mundo(self):
         return ANCHO // ESCALA_PIXEL
 
-    def calcular_rects(self):
+    def _alto_mundo(self):
+        return ALTO // ESCALA_PIXEL
+
+    def _calcular_posiciones_abanico(self, cantidad):
         e = ESCALA_PIXEL
         ancho_m = self._ancho_mundo()
 
+        cx_centro = ancho_m // 2
+        cy_centro = Layout.Y_TOP_MANO + Layout.CARTA_H // 2 - 40
+
+        if cantidad <= 0:
+            return []
+
+        if cantidad > 1:
+            medio = (cantidad - 1) / 2.0
+            angulos = [-Layout.ABANICO_ANGULO_JUGADOR * (i - medio) / medio
+                       for i in range(cantidad)]
+        else:
+            medio = 0
+            angulos = [0]
+
+        posiciones = []
+        for i in range(cantidad):
+            dist_al_centro = abs(i - medio)
+            dx = (i - medio) * Layout.ABANICO_SEP_X_JUGADOR
+            dy = dist_al_centro * Layout.ABANICO_OFFSET_Y_JUGADOR
+
+            cx = cx_centro + dx
+            cy = cy_centro + dy
+            posiciones.append((cx, cy, angulos[i]))
+
+        return posiciones
+
+    def calcular_rects(self):
+        e = ESCALA_PIXEL
+
         vivas_j = [(i, c) for i, c in enumerate(self.juego.mazo_jugador.cartas) if c.viva]
         cantidad_j = len(vivas_j)
+
+        self.posiciones_jugador = self._calcular_posiciones_abanico(cantidad_j)
         self.rects_jugador = []
 
-        if cantidad_j > 0:
-            x_inicio_m = Layout.x_inicio_cartas(cantidad_j, ancho_m)
-            for pos, (idx_real, _) in enumerate(vivas_j):
-                x_m = x_inicio_m + pos * (Layout.CARTA_W + Layout.ESPACIO_CARTAS)
-                rect = pygame.Rect(
-                    x_m * e, Layout.Y_TOP_MANO * e,
-                    Layout.CARTA_W * e, Layout.CARTA_H * e,
-                )
-                self.rects_jugador.append((idx_real, rect))
+        for pos, (idx_real, _) in enumerate(vivas_j):
+            if pos >= len(self.posiciones_jugador):
+                break
+            cx, cy, _ = self.posiciones_jugador[pos]
+            cx_px = cx * e
+            cy_px = cy * e
+            w = Layout.CARTA_W * e
+            h = Layout.CARTA_H * e
+            rect = pygame.Rect(
+                cx_px - w // 2, cy_px - h // 2, w, h,
+            )
+            self.rects_jugador.append((idx_real, rect))
 
         vivas_e = [(i, c) for i, c in enumerate(self.juego.mazo_enemigo.cartas) if c.viva]
         self.rects_enemigo = [(idx_real, pygame.Rect(0, 0, 0, 0))
                               for idx_real, _ in vivas_e]
 
     def _actualizar_emotes(self):
-        """Detecta cambios de HP o empates y actualiza los emotes."""
         self.quien_recibio_dano = None
 
         mensaje_actual = self.juego.mensaje
@@ -193,28 +206,24 @@ class EscenaJuego(Escena):
             and mensaje_actual != self.mensaje_anterior
         )
 
-        # Dano al jugador
         if self.juego.hp_jugador < self.hp_jugador_anterior:
             self.emote_jugador_actual = "triste"
             self.emote_rival_actual = "feliz"
             self.tiempo_emote = pygame.time.get_ticks()
             self.quien_recibio_dano = "jugador"
 
-        # Dano al rival
         elif self.juego.hp_enemigo < self.hp_enemigo_anterior:
             self.emote_rival_actual = "triste"
             self.emote_jugador_actual = "feliz"
             self.tiempo_emote = pygame.time.get_ticks()
             self.quien_recibio_dano = "rival"
 
-        # Empate
         elif hubo_empate:
             self.emote_jugador_actual = "triste"
             self.emote_rival_actual = "triste"
             self.tiempo_emote = pygame.time.get_ticks()
             self.quien_recibio_dano = "empate"
 
-        # Volver a neutro
         if self.tiempo_emote > 0:
             if pygame.time.get_ticks() - self.tiempo_emote > EMOTE_DURACION:
                 self.emote_rival_actual = "neutro"
@@ -248,8 +257,12 @@ class EscenaJuego(Escena):
             if self.juego.turno == Turno.JUGADOR:
                 for idx, rect in self.rects_jugador:
                     if rect.collidepoint(mouse):
-                        self.juego.jugador_tira_carta(idx)
-                        self.tiempo_resolucion = pygame.time.get_ticks()
+                        carta = self.juego.mazo_jugador[idx]
+                        if carta.tipo == "hechizo":
+                            self.juego.usar_hechizo(idx, target_idx=0)
+                        else:
+                            self.juego.jugador_tira_carta(idx)
+                            self.tiempo_resolucion = pygame.time.get_ticks()
                         break
 
             elif self.juego.turno == Turno.RESOLVIENDO:
@@ -282,6 +295,7 @@ class EscenaJuego(Escena):
             hp_img=self.hp_img,
             mesa_img=self.mesa_img,
             reversos_img=self.reversos_img,
+            posiciones_jugador=self.posiciones_jugador,
         )
 
     def _emote_rival(self):
