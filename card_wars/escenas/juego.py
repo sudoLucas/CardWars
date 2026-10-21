@@ -213,14 +213,19 @@ class EscenaJuego(Escena):
         self.posiciones_jugador = self._calcular_posiciones_abanico(cantidad_j)
         self.rects_jugador = []
 
-        for pos, (idx_real, _) in enumerate(vivas_j):
+        for pos, (idx_real, carta) in enumerate(vivas_j):
             if pos >= len(self.posiciones_jugador):
                 break
             cx, cy, _ = self.posiciones_jugador[pos]
             cx_px = cx * e
             cy_px = cy * e
-            w = Layout.CARTA_W * e
-            h = Layout.CARTA_H * e
+            escala = (
+                Layout.ESCALA_CARTA_HECHIZO
+                if getattr(carta, "tipo", "criatura") == "hechizo"
+                else 1
+            )
+            w = int(Layout.CARTA_W * escala * e)
+            h = int(Layout.CARTA_H * escala * e)
             rect = pygame.Rect(cx_px - w // 2, cy_px - h // 2, w, h)
             self.rects_jugador.append((idx_real, rect))
 

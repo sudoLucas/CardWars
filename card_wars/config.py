@@ -89,6 +89,7 @@ class Escena:
 class Layout:
     # Cartas
     CARTA_W, CARTA_H = 55, 68
+    ESCALA_CARTA_HECHIZO = 0.85
     ESPACIO_CARTAS   = 14
 
     # --- Abanico del rival ---

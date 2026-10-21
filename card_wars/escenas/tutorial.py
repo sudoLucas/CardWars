@@ -101,12 +101,17 @@ class EscenaTutorial(Escena):
                 ))
 
         self.rects_jugador = []
-        for pos, (idx_real, _) in enumerate(vivas_j):
+        for pos, (idx_real, carta) in enumerate(vivas_j):
             if pos >= len(self.posiciones_jugador):
                 break
             cx_m, cy_m, _ = self.posiciones_jugador[pos]
-            w = Layout.CARTA_W * e
-            h = Layout.CARTA_H * e
+            escala = (
+                Layout.ESCALA_CARTA_HECHIZO
+                if getattr(carta, "tipo", "criatura") == "hechizo"
+                else 1
+            )
+            w = int(Layout.CARTA_W * escala * e)
+            h = int(Layout.CARTA_H * escala * e)
             # ACÁ: Rect en píxeles reales para los clicks
             rect = pygame.Rect(
                 int(cx_m * e - w // 2), 
@@ -157,6 +162,11 @@ class EscenaTutorial(Escena):
                 self._avanzar_dialogo()
                 return
 
+            if (self.hechizo_seleccionado is not None
+                    and not self._hechizos_habilitados()):
+                self.hechizo_seleccionado = None
+                return
+
             # Click en el hechizo ya seleccionado
             if self.hechizo_seleccionado is not None:
                 carta = self.juego.mazo_jugador[self.hechizo_seleccionado]
@@ -187,6 +197,8 @@ class EscenaTutorial(Escena):
                 if rect.collidepoint(mouse):
                     carta = self.juego.mazo_jugador[idx]
                     if getattr(carta, "tipo", "criatura") == "hechizo":
+                        if not self._hechizos_habilitados():
+                            return
                         data = HECHIZOS.get(carta.hechizo_id, {})
                         target = data.get("target", "")
                         if target == "carta_rival":
@@ -209,13 +221,18 @@ class EscenaTutorial(Escena):
         x_m = cx_duelo - Layout.CARTA_W // 2
         y_m = cy_duelo + Layout.DUELO_SEP_Y
         
-        # Multiplicamos por la escala
+        # Cubre el desplazamiento de flotacion e inclinacion de la carta.
+        margen = 5 * e
         return pygame.Rect(
-            x_m * e, 
-            y_m * e, 
-            Layout.CARTA_W * e, 
-            Layout.CARTA_H * e
+            x_m * e - margen,
+            y_m * e - margen,
+            Layout.CARTA_W * e + margen * 2,
+            Layout.CARTA_H * e + margen * 2,
         )
+
+    def _hechizos_habilitados(self):
+        return self.ronda_tutorial >= 2
+
     def _avanzar_dialogo(self):
         dialogos = DIALOGOS_TUTORIAL.get(self.ronda_tutorial, [])
         if self.paso_dialogo < len(dialogos) - 1:
@@ -270,26 +287,36 @@ class EscenaTutorial(Escena):
         dialogos = DIALOGOS_TUTORIAL.get(self.ronda_tutorial, [])
         if 0 <= self.paso_dialogo < len(dialogos):
             texto = dialogos[self.paso_dialogo].replace("zz ", "")
-            
-            font = self.fuentes["chica"]
-            palabras = texto.split(' ')
+
+            font = self.fuentes["mini"]
+            palabras = texto.split()
             lineas = []
             linea_actual = ""
-            ancho_max_texto = self.panel_rect.width - 20 
+            area_texto = self.panel_rect.inflate(-20, -52)
             
             for p in palabras:
-                test_linea = linea_actual + p + " "
-                if font.size(test_linea)[0] < ancho_max_texto:
+                test_linea = f"{linea_actual} {p}".strip()
+                if font.size(test_linea)[0] <= area_texto.width:
                     linea_actual = test_linea
                 else:
-                    lineas.append(linea_actual)
-                    linea_actual = p + " "
-            lineas.append(linea_actual)
+                    if linea_actual:
+                        lineas.append(linea_actual)
+                    linea_actual = p
+            if linea_actual:
+                lineas.append(linea_actual)
 
-            y_offset = self.panel_rect.y + 10
+            clip_anterior = self.render.ui.get_clip()
+            self.render.ui.set_clip(area_texto)
+            y_offset = area_texto.y
             for linea in lineas:
-                self.render._texto_ui(linea, font, (220, 220, 220), self.panel_rect.x + 10, y_offset)
-                y_offset += font.get_height() + 2
+                if y_offset + font.get_height() > area_texto.bottom:
+                    break
+                self.render._texto_ui(
+                    linea, font, (220, 220, 220),
+                    area_texto.x, y_offset,
+                )
+                y_offset += font.get_height() + 4
+            self.render.ui.set_clip(clip_anterior)
 
             self.render._texto_ui("click", self.fuentes["mini"], (140, 140, 140),
                                   self.panel_rect.x + 10, self.panel_rect.bottom - 20)

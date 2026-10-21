@@ -197,14 +197,16 @@ class Render:
                                seleccionada=False):
         w, h = Layout.CARTA_W, Layout.CARTA_H
         factor = 2
+        es_hechizo = (getattr(carta, "tipo", "criatura") == "hechizo")
+        escala_base = Layout.ESCALA_CARTA_HECHIZO if es_hechizo else 1
 
         if hover:
-            escala = HOVER_ESCALA
+            escala = escala_base * HOVER_ESCALA
             w_draw = int(w * escala)
             h_draw = int(h * escala)
         else:
-            w_draw = w
-            h_draw = h
+            w_draw = int(w * escala_base)
+            h_draw = int(h * escala_base)
 
         surf = pygame.Surface(
             (w_draw + PAD_ROTACION * 2, h_draw + PAD_ROTACION * 2),
@@ -219,8 +221,6 @@ class Render:
             color = COLOR_JUGADOR_HOVER
         else:
             color = COLOR_JUGADOR
-
-        es_hechizo = (getattr(carta, "tipo", "criatura") == "hechizo")
 
         rect = pygame.Rect(ox, oy, w_draw, h_draw)
         pygame.draw.rect(surf, color, rect)
