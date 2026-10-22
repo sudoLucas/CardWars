@@ -38,12 +38,14 @@ Para cambiar la dificultad:
 
 1. En el menu principal, elegi **DIFICULTAD**.
 2. Vas a ver tres botones:
-- **Facil**: la IA juega al azar. Tenes 3 cartas en mano. Es la
-  dificultad recomendada para aprender.
+- **Facil**: la IA juega al azar. Tenes 3 cartas en mano y empezas
+  con 70 HP frente a los 60 HP del rival. Es la dificultad
+  recomendada para aprender.
 - **Normal**: la IA guarda sus cartas fuertes. Tenes 4 cartas en
-  mano. Desafio parejo.
+  mano y empezas con 80 HP frente a los 100 HP del rival.
 - **Duro de cojones**: la IA reacciona a lo que jugas. Tenes 6
-  cartas en mano. Solo para expertos.
+  cartas en mano y empezas con 90 HP frente a los 140 HP del rival.
+  Solo para expertos.
 3. El boton de la dificultad actual se ve resaltado en verde.
 4. Hace click en la dificultad que quieras usar.
 5. Volves automaticamente al menu principal.
@@ -56,8 +58,8 @@ Cuando empezas una partida vas a ver:
 
 **Arriba:**
 
-- **RIVAL: 250 HP** (barra roja a la izquierda).
-- **TU: 250 HP** (barra azul a la derecha).
+- El HP inicial depende de la dificultad elegida; se muestra en las
+  barras del rival y del jugador.
 
 **En el centro de arriba:**
 

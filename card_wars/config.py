@@ -389,8 +389,8 @@ class ConfigDificultad:
 
 DIFICULTAD_FACIL = ConfigDificultad(
     nombre        = "Fácil",
-    hp_jugador    = 200,
-    hp_enemigo    = 150,
+    hp_jugador    = 70,
+    hp_enemigo    = 60,
     tamano_mazo   = 3,
     estrategia_ia = "IARandom",
     descripcion   = "",
@@ -398,8 +398,8 @@ DIFICULTAD_FACIL = ConfigDificultad(
 
 DIFICULTAD_NORMAL = ConfigDificultad(
     nombre        = "Normal",
-    hp_jugador    = 250,
-    hp_enemigo    = 250,
+    hp_jugador    = 80,
+    hp_enemigo    = 100,
     tamano_mazo   = 4,
     estrategia_ia = "IAConservadora",
     descripcion   = "",
@@ -407,8 +407,8 @@ DIFICULTAD_NORMAL = ConfigDificultad(
 
 DIFICULTAD_DURO = ConfigDificultad(
     nombre        = "Duro de cojones",
-    hp_jugador    = 250,
-    hp_enemigo    = 300,
+    hp_jugador    = 90,
+    hp_enemigo    = 140,
     tamano_mazo   = 6,
     estrategia_ia = "IAAdaptativa",
     descripcion   = "",
