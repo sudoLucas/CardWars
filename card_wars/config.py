@@ -89,7 +89,8 @@ class Escena:
 class Layout:
     # Cartas
     CARTA_W, CARTA_H = 55, 68
-    ESCALA_CARTA_HECHIZO = 0.85
+    ESCALA_CARTA_MANO = 0.84
+    ESCALA_CARTA_HECHIZO = 0.95
     ESPACIO_CARTAS   = 14
 
     # --- Abanico del rival ---
@@ -118,6 +119,143 @@ class Layout:
     def x_inicio_cartas(cls, cantidad, ancho_mundo):
         total = cantidad * cls.CARTA_W + (cantidad - 1) * cls.ESPACIO_CARTAS
         return (ancho_mundo - total) // 2
+
+    @classmethod
+    def escala_carta_mano(cls, carta):
+        escala = cls.ESCALA_CARTA_MANO
+        if getattr(carta, "tipo", "criatura") == "hechizo":
+            escala *= cls.ESCALA_CARTA_HECHIZO
+        return escala
+
+    @classmethod
+    def escalas_mano(cls, cartas, ancho_mundo):
+        _, escalas = cls.distribucion_mano(
+            cartas, ancho_mundo, 200,
+        )
+        return escalas
+
+    @classmethod
+    def posiciones_mano(cls, cartas, ancho_mundo, alto_mundo,
+                        reservar_hueco=False):
+        posiciones, _ = cls.distribucion_mano(
+            cartas, ancho_mundo, alto_mundo, reservar_hueco,
+        )
+        return posiciones
+
+    @classmethod
+    def distribucion_mano(cls, cartas, ancho_mundo, alto_mundo,
+                          reservar_hueco=False):
+        cantidad = len(cartas)
+        if cantidad == 0:
+            return [], []
+
+        escalas_base = [cls.escala_carta_mano(carta) for carta in cartas]
+        espacio = 2
+        if reservar_hueco:
+            borde_izquierdo = 6
+            borde_derecho = ancho_mundo - 46
+            ancho_hueco = cls.CARTA_W + 12
+            centro = ancho_mundo / 2
+            fin_izquierda = centro - ancho_hueco / 2
+            inicio_derecha = centro + ancho_hueco / 2
+            ancho_izquierda = fin_izquierda - borde_izquierdo
+            ancho_derecha = borde_derecho - inicio_derecha
+
+            mejor = None
+            for cantidad_izquierda in range(cantidad + 1):
+                cantidad_derecha = cantidad - cantidad_izquierda
+                ancho_req_izquierda = sum(
+                    cls.CARTA_W * escala
+                    for escala in escalas_base[:cantidad_izquierda]
+                ) + espacio * max(0, cantidad_izquierda - 1)
+                ancho_req_derecha = sum(
+                    cls.CARTA_W * escala
+                    for escala in escalas_base[cantidad_izquierda:]
+                ) + espacio * max(0, cantidad_derecha - 1)
+
+                ajuste_izquierda = (
+                    ancho_izquierda / ancho_req_izquierda
+                    if ancho_req_izquierda else 1
+                )
+                ajuste_derecha = (
+                    ancho_derecha / ancho_req_derecha
+                    if ancho_req_derecha else 1
+                )
+                ajuste = min(1, ajuste_izquierda, ajuste_derecha)
+                clave = (ajuste, -abs(cantidad_izquierda - cantidad / 2))
+                if mejor is None or clave > mejor[0]:
+                    mejor = (
+                        clave, cantidad_izquierda,
+                        [escala * ajuste for escala in escalas_base],
+                    )
+
+            _, cantidad_izquierda, escalas = mejor
+            anchos = [cls.CARTA_W * escala for escala in escalas]
+            centro_y = alto_mundo - 18 - max(
+                cls.CARTA_H * escala for escala in escalas
+            ) / 2
+            posiciones = []
+
+            for inicio, fin, desde, hasta in (
+                (borde_izquierdo, fin_izquierda, 0, cantidad_izquierda),
+                (inicio_derecha, borde_derecho, cantidad_izquierda, cantidad),
+            ):
+                grupo_anchos = anchos[desde:hasta]
+                ancho_grupo = sum(grupo_anchos) + espacio * max(
+                    0, len(grupo_anchos) - 1,
+                )
+                x = inicio + (fin - inicio - ancho_grupo) / 2
+                for ancho in grupo_anchos:
+                    posiciones.append((x + ancho / 2, centro_y, 0))
+                    x += ancho + espacio
+            return posiciones, escalas
+
+        ancho_util = max(1, ancho_mundo - 54)
+        ancho_total_base = sum(
+            cls.CARTA_W * escala for escala in escalas_base
+        )
+        ancho_cartas_util = ancho_util - espacio * (cantidad - 1)
+        ajuste = min(1, ancho_cartas_util / ancho_total_base)
+        escalas = [escala * ajuste for escala in escalas_base]
+        anchos = [cls.CARTA_W * escala for escala in escalas]
+        ancho_total = sum(anchos) + espacio * (cantidad - 1)
+        x = (ancho_mundo - 46 - ancho_total) / 2
+        centro_y = alto_mundo - 18 - max(
+            cls.CARTA_H * escala for escala in escalas
+        ) / 2
+
+        posiciones = []
+        for ancho in anchos:
+            posiciones.append((x + ancho / 2, centro_y, 0))
+            x += ancho + espacio
+        return posiciones, escalas
+
+    @classmethod
+    def posiciones_rival(cls, cantidad, ancho_mundo, factor_espaciado=1):
+        medio = (cantidad - 1) / 2 if cantidad > 0 else 0
+        cx_centro = ancho_mundo // 2
+        posiciones = []
+        for indice in range(cantidad):
+            distancia = abs(indice - medio)
+            dx = (indice - medio) * cls.ABANICO_SEP_X * factor_espaciado
+            dy = distancia * cls.ABANICO_OFFSET_Y
+            posiciones.append(
+                (cx_centro + int(dx), cls.Y_CENTRO_RIVAL + int(dy))
+            )
+        return posiciones
+
+    @staticmethod
+    def factor_animacion_objetivo(elapsed_ms):
+        def suavizar(t):
+            return t * t * (3 - 2 * t)
+
+        if elapsed_ms < 150:
+            t = max(0, elapsed_ms / 150)
+            return 1 - 0.18 * suavizar(t)
+        if elapsed_ms < 420:
+            t = (elapsed_ms - 150) / 270
+            return 0.82 + 0.36 * suavizar(t)
+        return 1.18
 
 
 # ============================================================
@@ -157,12 +295,14 @@ MANA_SUMA_MAX = 2
 HECHIZOS = {
     "vision": {
         "nombre": "Vision",
+        "nombre_carta": "Vision",
         "costo": 1,
         "target": "carta_rival",
         "descripcion": "Ver una carta del rival por 1.5s",
     },
     "fuerza": {
         "nombre": "Pocion de fuerza",
+        "nombre_carta": "Fuerza",
         "costo": 2,
         "target": "criatura_propia",
         "bonus_poder": 5,
@@ -170,6 +310,7 @@ HECHIZOS = {
     },
     "defensa": {
         "nombre": "Pocion de defensa",
+        "nombre_carta": "Defensa",
         "costo": 2,
         "target": "criatura_propia",
         "bonus_aguante": 5,
@@ -177,6 +318,7 @@ HECHIZOS = {
     },
     "curacion": {
         "nombre": "Curacion",
+        "nombre_carta": "Curacion",
         "costo": 3,
         "target": "jugador",
         "bonus_hp": 20,
@@ -184,6 +326,7 @@ HECHIZOS = {
     },
     "rayo": {
         "nombre": "Rayo",
+        "nombre_carta": "Rayo",
         "costo": 3,
         "target": "criatura_rival",
         "daño": 10,
@@ -191,6 +334,7 @@ HECHIZOS = {
     },
     "debilidad": {
         "nombre": "Debilidad",
+        "nombre_carta": "Debilidad",
         "costo": 3,
         "target": "criatura_rival",
         "bonus_poder": -5,
@@ -198,12 +342,14 @@ HECHIZOS = {
     },
     "robo": {
         "nombre": "Robo",
+        "nombre_carta": "Robo",
         "costo": 3,
         "target": "carta_rival",
         "descripcion": "Robar una carta del rival",
     },
-        "drenaje": {
+    "drenaje": {
         "nombre": "Drenaje",
+        "nombre_carta": "Drenaje",
         "costo": 3,
         "target": "criatura_rival",
         "daño": 8,
@@ -212,9 +358,11 @@ HECHIZOS = {
     },
     "inmovilizar": {
         "nombre": "Inmovilizar",
+        "nombre_carta": "Inmovilizar",
         "costo": 4,
         "target": "criatura_rival",
-        "descripcion": "La criatura rival no ataca este turno",
+        "daño_aguante": 10,
+        "descripcion": "Resta 10 de aguante a la criatura rival",
     },
 }
 
@@ -266,40 +414,41 @@ DIFICULTAD_DURO = ConfigDificultad(
     descripcion   = "",
 )
 
-DIFICULTAD_TUTORIAL = ConfigDificultad(
-    nombre        = "Tutorial",
-    hp_jugador    = 250,
-    hp_enemigo    = 250,
-    tamano_mazo   = 3,
-    estrategia_ia = "IATutorial",
-    descripcion   = "Aprende a jugar en 3 rondas.",
-)
-
 # ============================================================
 # TUTORIAL
 # ============================================================
-TUTORIAL_ROUNDS = 3
+TUTORIAL_ROUNDS = 4
 
 # Textos por ronda (con zz adelante)
 DIALOGOS_TUTORIAL = {
     1: [
-        "zz El rival ya bajo una criatura. Vas a ver su carta revelada en el centro.",
-        "zz Ahora baja la tuya: hace click en una de las cartas de tu mano.",
-        "zz Antes de pelear, podes mirar tu carta. Con el mouse encima, ves sus datos.",
-        "zz Cuando estes listo, hace click de nuevo en tu criatura para iniciar el duelo.",
-        "zz Si tu criatura tiene mas poder que la del rival, ganas el duelo.",
+        "zz Cada criatura tiene fuerza y vida (o aguante). La fuerza indica cuanto dano hace; la vida, cuanto puede resistir.",
+        "zz Pasa el cursor por una carta para ver sus valores. El numero grande es la fuerza; la barra inferior muestra su vida actual.",
+        "zz La criatura rival ya esta en la mesa. Baja una criatura de tu mano para enfrentarte a ella.",
+        "zz Con la criatura en la mesa, podes revisar sus datos antes de decidir si iniciar el duelo.",
+        "zz En este primer cruce, Perro tiene fuerza y vida 10; Gato y Slime tienen 5. Proba bajar Perro y luego inicia el duelo.",
+        "zz Si una criatura golpea primero y su fuerza alcanza la vida rival, la derrota antes de recibir un contraataque.",
     ],
     2: [
-        "zz Bien. Antes de pelear, proba los hechizos.",
-        "zz Vision revela una carta del rival. Robo te la roba y la guardas.",
-        "zz Los hechizos cuestan mana. El mana sube un poco cada ronda.",
-        "zz Hace click en un hechizo y despues en el slot de la carta del rival.",
-        "zz Ahora si, a pelear. Click en tu criatura.",
+        "zz Ahora hay dos hechizos para probar: Vision y Robo. Los hechizos cuestan mana; el frasco muestra cuanto tenes.",
+        "zz Vision revela por un momento una carta rival. Seleccionala y despues elegi una carta elegible; la criatura en mesa no se puede elegir.",
+        "zz Cuando termines de mirar, proba Robo: elegi esa otra carta rival y la sumaras a tu mazo.",
+        "zz El mana se recupera y aumenta un poco al comenzar cada ronda. Podes usar mas de un hechizo si te alcanza.",
+        "zz Cuando quieras cerrar la ronda, inicia el duelo con tu criatura.",
     ],
     3: [
-        "zz Ahora una ronda vos solo.",
-        "zz Tira tu criatura y pelea cuando estes listo.",
-        "zz Ya sabes jugar. Ahora jugate un duelo de verdad.",
+        "zz Hagamos una prueba de aguante. Tu Perro tiene fuerza 10 y vida 10; el Dragon rival, fuerza 15 y vida 15.",
+        "zz Inmovilizar le quita 10 de vida actual al Dragon: queda con 5. Su fuerza sigue siendo 15.",
+        "zz La prioridad depende de la vida actual: tu Perro tiene 10 y el Dragon 5, asi que Perro golpea primero.",
+        "zz Sus 10 de fuerza alcanzan para quitar los 5 de vida que le quedan al Dragon. Al caer antes, el Dragon no llega a contraatacar.",
+        "zz Baja a Perro, usa Inmovilizar sobre el Dragon y despues inicia el duelo. Esta vez el hechizo es parte de la jugada.",
+    ],
+    4: [
+        "zz Repetimos la idea con valores mayores: tu Fenix tiene fuerza y vida 20; el Golem rival, 25.",
+        "zz Inmovilizar deja al Golem con 15 de vida, pero conserva sus 25 de fuerza.",
+        "zz Fenix tiene 20 de vida frente a 15: vuelve a tener prioridad. Sus 20 de fuerza alcanzan para derrotar al Golem antes del contraataque.",
+        "zz Baja a Fenix, usa Inmovilizar sobre el Golem y confirma el resultado iniciando el duelo.",
+        "zz La regla no depende de que sean numeros chicos: compara la vida actual para saber quien actua primero y la fuerza para saber si ese golpe alcanza.",
     ],
 }
 
@@ -313,6 +462,16 @@ class ConfigTutorial:
     estrategia_ia:    str
     descripcion:      str
     es_tutorial:      bool = True
+
+
+DIFICULTAD_TUTORIAL = ConfigTutorial(
+    nombre="Tutorial",
+    hp_jugador=250,
+    hp_enemigo=250,
+    tamano_mazo=3,
+    estrategia_ia="IATutorial",
+    descripcion="Aprende las reglas con cuatro duelos guiados.",
+)
 
 DIFICULTADES = {
     "tutorial": DIFICULTAD_TUTORIAL,

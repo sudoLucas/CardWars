@@ -16,7 +16,6 @@ class Carta:
 
         self.buff_poder = 0
         self.buff_aguante = 0
-        self.inmovilizada = False
 
     def recibir_golpe(self, cantidad):
         self.aguante -= cantidad
@@ -33,7 +32,6 @@ class Carta:
         self.aguante = self.aguante_original
         self.buff_poder = 0
         self.buff_aguante = 0
-        self.inmovilizada = False
 
     def __repr__(self):
         return (f"{self.nombre}({self.poder}, aguante {self.aguante}, "

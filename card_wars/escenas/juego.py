@@ -59,9 +59,12 @@ class EscenaJuego(Escena):
 
         self.rects_jugador = []
         self.posiciones_jugador = []
+        self.escalas_jugador = []
         self.rects_enemigo = []
         self.mouse = (0, 0)
         self.foco_teclado = 0
+        self.foco_zona = "mano"
+        self.foco_objetivo = 0
 
         self.hp_img = self._cargar(RUTA_HP)
         self.mesa_img = self._cargar(RUTA_MESA)
@@ -80,10 +83,12 @@ class EscenaJuego(Escena):
         self.mensaje_anterior = self.juego.mensaje
 
         self.hechizo_seleccionado = None
+        self.animacion_target_inicio = None
         self.mensaje_hechizo_temporal = ""
         self.tiempo_mensaje_hechizo = 0
 
         self.rects_cartas_rival_clickeables = []
+        self.slots_rival_objetivo = []
 
     def _elegir_personajes(self):
         self.personaje_jugador = random.choice(PERSONAJES)
@@ -139,9 +144,12 @@ class EscenaJuego(Escena):
         self.mensaje_anterior = self.juego.mensaje
 
         self.hechizo_seleccionado = None
+        self.animacion_target_inicio = None
         self.mensaje_hechizo_temporal = ""
         self.tiempo_mensaje_hechizo = 0
         self.foco_teclado = 0
+        self.foco_zona = "mano"
+        self.foco_objetivo = 0
 
     def _ancho_mundo(self):
         return ANCHO // ESCALA_PIXEL
@@ -149,68 +157,50 @@ class EscenaJuego(Escena):
     def _alto_mundo(self):
         return ALTO // ESCALA_PIXEL
 
-    def _calcular_posiciones_abanico(self, cantidad):
+    def _calcular_posiciones_abanico(self, cartas, reservar_hueco=False):
         ancho_m = self._ancho_mundo()
         alto_m = self._alto_mundo()
+        return Layout.distribucion_mano(
+            cartas, ancho_m, alto_m, reservar_hueco,
+        )
 
-        cx_centro = ancho_m // 2
-        MARGEN_INFERIOR = 2
-        cy_centro = alto_m - MARGEN_INFERIOR - (Layout.CARTA_H // 2)
-
-        if cantidad <= 0:
-            return []
-
-        if cantidad > 1:
-            medio = (cantidad - 1) / 2.0
-        else:
-            medio = 0
-
-        posiciones = []
-        for i in range(cantidad):
-            dx = (i - medio) * Layout.ABANICO_SEP_X_JUGADOR
-            cx = cx_centro + dx
-            cy = cy_centro
-            posiciones.append((cx, cy, 0))
-
-        return posiciones
+    def _factor_espaciado_rival(self):
+        if self.hechizo_seleccionado is None or self.animacion_target_inicio is None:
+            return 1
+        carta = self.juego.mazo_jugador[self.hechizo_seleccionado]
+        if HECHIZOS.get(carta.hechizo_id, {}).get("target") != "carta_rival":
+            return 1
+        elapsed = pygame.time.get_ticks() - self.animacion_target_inicio
+        return Layout.factor_animacion_objetivo(elapsed)
 
     def _calcular_posiciones_rival(self, cantidad):
         ancho_m = self._ancho_mundo()
         e = ESCALA_PIXEL
-        cx_centro = ancho_m // 2
-        cy_centro = Layout.Y_CENTRO_RIVAL
-
-        if cantidad <= 0:
-            return []
-
-        if cantidad > 1:
-            medio = (cantidad - 1) / 2.0
-        else:
-            medio = 0
-
         resultado = []
-        w = Layout.CARTA_W * e
-        h = Layout.CARTA_H * e
-
-        for i in range(cantidad):
-            dist_al_centro = abs(i - medio)
-            dx = (i - medio) * Layout.ABANICO_SEP_X
-            dy = dist_al_centro * Layout.ABANICO_OFFSET_Y
-
-            cx = (cx_centro + int(dx)) * e
-            cy = (cy_centro + int(dy)) * e
-
-            rect = pygame.Rect(cx - w // 2, cy - h // 2, w, h)
+        posiciones = Layout.posiciones_rival(
+            cantidad, ancho_m, self._factor_espaciado_rival(),
+        )
+        for i, (cx_m, cy_m) in enumerate(posiciones):
+            cx = cx_m * e
+            cy = cy_m * e
+            rect = pygame.Rect(cx - 60, cy - 60, 120, 120)
             resultado.append((i, rect))
         return resultado
 
     def calcular_rects(self):
         e = ESCALA_PIXEL
 
-        vivas_j = [(i, c) for i, c in enumerate(self.juego.mazo_jugador.cartas) if c.viva]
-        cantidad_j = len(vivas_j)
-
-        self.posiciones_jugador = self._calcular_posiciones_abanico(cantidad_j)
+        vivas_j = [
+            (i, carta)
+            for i, carta in enumerate(self.juego.mazo_jugador.cartas)
+            if carta.viva and i != self.juego.carta_jugada_jugador
+        ]
+        self.posiciones_jugador, self.escalas_jugador = (
+            self._calcular_posiciones_abanico(
+                [carta for _, carta in vivas_j],
+                reservar_hueco=self.juego.carta_jugada_jugador is not None,
+            )
+        )
         self.rects_jugador = []
 
         for pos, (idx_real, carta) in enumerate(vivas_j):
@@ -219,27 +209,58 @@ class EscenaJuego(Escena):
             cx, cy, _ = self.posiciones_jugador[pos]
             cx_px = cx * e
             cy_px = cy * e
-            escala = (
-                Layout.ESCALA_CARTA_HECHIZO
-                if getattr(carta, "tipo", "criatura") == "hechizo"
-                else 1
-            )
+            escala = self.escalas_jugador[pos]
             w = int(Layout.CARTA_W * escala * e)
             h = int(Layout.CARTA_H * escala * e)
-            rect = pygame.Rect(cx_px - w // 2, cy_px - h // 2, w, h)
+            rect = pygame.Rect(
+                cx_px - w // 2,
+                cy_px - h // 2,
+                w,
+                h,
+            )
             self.rects_jugador.append((idx_real, rect))
 
-        vivas_e = [(i, c) for i, c in enumerate(self.juego.mazo_enemigo.cartas) if c.viva]
+        vivas_e = [
+            (i, carta)
+            for i, carta in enumerate(self.juego.mazo_enemigo.cartas)
+            if carta.viva
+        ]
         self.rects_enemigo = [(idx_real, pygame.Rect(0, 0, 0, 0))
                               for idx_real, _ in vivas_e]
-        self.rects_cartas_rival_clickeables = self._calcular_posiciones_rival(len(vivas_e))
+        posiciones_rival = self._calcular_posiciones_rival(len(vivas_e))
+        indices_objetivo = {
+            indice: objetivo
+            for objetivo, (indice, _) in enumerate(
+                self.juego._cartas_rivales_objetivo()
+            )
+        }
+        self.rects_cartas_rival_clickeables = [
+            (indices_objetivo[indice_real], rect)
+            for (indice_real, _), (_, rect) in zip(vivas_e, posiciones_rival)
+            if indice_real in indices_objetivo
+        ]
+        self.slots_rival_objetivo = [
+            visual
+            for visual, (indice_real, _) in enumerate(vivas_e)
+            if indice_real in indices_objetivo
+        ]
 
-        # Si el foco se fue de rango (ej. por usar una carta), lo reseteamos
         if len(self.rects_jugador) > 0:
             if self.foco_teclado >= len(self.rects_jugador):
                 self.foco_teclado = len(self.rects_jugador) - 1
         else:
             self.foco_teclado = 0
+            if self.foco_zona == "mano":
+                self.foco_zona = "mesa" if self.juego.carta_jugada_jugador is not None else "mano"
+
+        if self.rects_cartas_rival_clickeables:
+            indices = [idx for idx, _ in self.rects_cartas_rival_clickeables]
+            if self.foco_objetivo not in indices:
+                self.foco_objetivo = indices[0]
+        else:
+            self.foco_objetivo = 0
+            if self.foco_zona == "objetivo":
+                self.foco_zona = "mano"
 
     def _actualizar_emotes(self):
         self.quien_recibio_dano = None
@@ -299,16 +320,29 @@ class EscenaJuego(Escena):
         self.tiempo_mensaje_hechizo = pygame.time.get_ticks()
 
     def _aplicar_hechizo_con_target(self, idx_hechizo, target_idx):
-        exito = self.juego.usar_hechizo(idx_hechizo, target_idx=target_idx)
+        self.juego.usar_hechizo(idx_hechizo, target_idx=target_idx)
         if self.juego.mensaje_hechizo:
             self._mostrar_mensaje_hechizo(self.juego.mensaje_hechizo)
         self.hechizo_seleccionado = None
+        self.animacion_target_inicio = None
+        self.foco_zona = "mano"
+        self.calcular_rects()
+
+    def _seleccionar_hechizo_target(self, idx_hechizo):
+        self.hechizo_seleccionado = idx_hechizo
+        self.animacion_target_inicio = pygame.time.get_ticks()
+        self.foco_zona = "objetivo"
+        if self.rects_cartas_rival_clickeables:
+            self.foco_objetivo = self.rects_cartas_rival_clickeables[0][0]
 
     def _aplicar_hechizo_directo(self, idx_hechizo):
-        exito = self.juego.usar_hechizo(idx_hechizo, target_idx=None)
+        self.juego.usar_hechizo(idx_hechizo, target_idx=None)
         if self.juego.mensaje_hechizo:
             self._mostrar_mensaje_hechizo(self.juego.mensaje_hechizo)
         self.hechizo_seleccionado = None
+        self.animacion_target_inicio = None
+        self.foco_zona = "mano"
+        self.calcular_rects()
 
     def _mensaje_hechizo_visible(self):
         if not self.mensaje_hechizo_temporal:
@@ -318,44 +352,122 @@ class EscenaJuego(Escena):
             return None
         return self.mensaje_hechizo_temporal
 
-    def _usar_carta_con_teclado(self):
-        if not self.rects_jugador:
+    def _mover_foco_objetivo(self, dx, dy):
+        if not self.rects_cartas_rival_clickeables:
+            return
+        actuales = dict(self.rects_cartas_rival_clickeables)
+        actual = actuales.get(self.foco_objetivo)
+        if actual is None:
+            self.foco_objetivo = self.rects_cartas_rival_clickeables[0][0]
             return
 
-        idx, rect = self.rects_jugador[self.foco_teclado]
+        cx, cy = actual.center
+        candidatos = []
+        for indice, rect in self.rects_cartas_rival_clickeables:
+            if indice == self.foco_objetivo:
+                continue
+            vx, vy = rect.centerx - cx, rect.centery - cy
+            avance = vx * dx + vy * dy
+            if avance > 0:
+                lateral = abs(vx * dy - vy * dx)
+                candidatos.append((lateral + avance * 0.2, indice))
+
+        if candidatos:
+            self.foco_objetivo = min(candidatos)[1]
+        else:
+            extremos = [
+                ((rect.centerx - cx) * dx + (rect.centery - cy) * dy, indice)
+                for indice, rect in self.rects_cartas_rival_clickeables
+            ]
+            self.foco_objetivo = min(extremos)[1]
+
+    def _mover_foco_teclado(self, direccion):
+        dx, dy = direccion
+        if self.foco_zona == "objetivo":
+            self._mover_foco_objetivo(dx, dy)
+            return
+
+        if self.foco_zona == "mesa":
+            if dy > 0 and self.rects_jugador:
+                self.foco_zona = "mano"
+            return
+
+        if dx:
+            if self.rects_jugador:
+                self.foco_teclado = (
+                    self.foco_teclado + (1 if dx > 0 else -1)
+                ) % len(self.rects_jugador)
+        elif dy and self.juego.turno == Turno.JUGADOR_HECHIZOS:
+            if dy < 0 and self.juego.carta_jugada_jugador is not None:
+                self.foco_zona = "mesa"
+
+    def _confirmar_foco_teclado(self):
+        if self.juego.turno == Turno.RESULTADO:
+            self.juego.siguiente_ronda()
+            self.tiempo_fase = pygame.time.get_ticks()
+            self.foco_zona = "mano"
+            self.calcular_rects()
+            return
+
+        if self.foco_zona == "objetivo":
+            if self.hechizo_seleccionado is not None:
+                self._aplicar_hechizo_con_target(
+                    self.hechizo_seleccionado, self.foco_objetivo,
+                )
+            return
+
+        if self.foco_zona == "mesa":
+            if self.juego.turno == Turno.JUGADOR_HECHIZOS:
+                self.juego.iniciar_duelo()
+                self.tiempo_fase = pygame.time.get_ticks()
+                self.foco_zona = "mano"
+            return
+
+        if not self.rects_jugador:
+            return
+        idx, _ = self.rects_jugador[self.foco_teclado]
         carta = self.juego.mazo_jugador[idx]
 
         if self.juego.turno == Turno.JUGADOR_TIRA:
             if getattr(carta, "tipo", "criatura") == "criatura":
                 self.juego.jugador_tira_carta(idx)
                 self.tiempo_fase = pygame.time.get_ticks()
+                self.foco_zona = "mesa"
+                self.calcular_rects()
             return
 
-        if self.juego.turno == Turno.JUGADOR_HECHIZOS:
-            if self.hechizo_seleccionado is not None:
-                # Si ya hay un hechizo seleccionado y apretas Enter, usa el slot 0
-                carta_sel = self.juego.mazo_jugador[self.hechizo_seleccionado]
-                data = HECHIZOS.get(carta_sel.hechizo_id, {})
-                if data.get("target") == "carta_rival":
-                    self._aplicar_hechizo_con_target(self.hechizo_seleccionado, 0)
-                else:
-                    self._aplicar_hechizo_directo(self.hechizo_seleccionado)
-                return
-
-            if getattr(carta, "tipo", "criatura") == "hechizo":
-                data = HECHIZOS.get(carta.hechizo_id, {})
-                target = data.get("target", "")
-                if target == "carta_rival":
-                    self.hechizo_seleccionado = idx
-                else:
-                    self._aplicar_hechizo_directo(idx)
+        if self.juego.turno != Turno.JUGADOR_HECHIZOS:
             return
+        if getattr(carta, "tipo", "criatura") != "hechizo":
+            return
+        if not self.juego.hechizo_es_usable(idx):
+            self.juego.usar_hechizo(idx, target_idx=None)
+            return
+
+        data = HECHIZOS.get(carta.hechizo_id, {})
+        if data.get("target") == "carta_rival":
+            self._seleccionar_hechizo_target(idx)
+        else:
+            self._aplicar_hechizo_directo(idx)
+
+    def _cancelar_foco_teclado(self):
+        if self.hechizo_seleccionado is not None:
+            self.hechizo_seleccionado = None
+            self.animacion_target_inicio = None
+            self.foco_zona = "mano"
+            return True
+        if self.foco_zona == "mesa":
+            self.foco_zona = "mano"
+            return True
+        return False
 
     def handle_event(self, evento, mouse):
         self.mouse = mouse
 
         if evento.type == pygame.KEYDOWN:
             if evento.key == pygame.K_ESCAPE:
+                if self._cancelar_foco_teclado():
+                    return
                 from escenas.menu import EscenaMenu
                 self.app.cambiar_escena(EscenaMenu(self.app))
                 return
@@ -364,32 +476,29 @@ class EscenaJuego(Escena):
                 return
 
             if evento.key in (pygame.K_LSHIFT, pygame.K_RSHIFT):
-                self.hechizo_seleccionado = None
+                self._cancelar_foco_teclado()
                 return
 
-            # Navegacion con teclado (izq/der)
             if evento.key in (pygame.K_a, pygame.K_LEFT):
-                if self.rects_jugador:
-                    self.foco_teclado = (self.foco_teclado - 1) % len(self.rects_jugador)
+                self._mover_foco_teclado((-1, 0))
                 return
-            elif evento.key in (pygame.K_d, pygame.K_RIGHT):
-                if self.rects_jugador:
-                    self.foco_teclado = (self.foco_teclado + 1) % len(self.rects_jugador)
+            if evento.key in (pygame.K_d, pygame.K_RIGHT):
+                self._mover_foco_teclado((1, 0))
+                return
+            if evento.key in (pygame.K_w, pygame.K_UP):
+                self._mover_foco_teclado((0, -1))
+                return
+            if evento.key in (pygame.K_s, pygame.K_DOWN):
+                self._mover_foco_teclado((0, 1))
                 return
 
-            # Accion con teclado (Space, Enter, Z)
             if evento.key in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_z):
-                if self.juego.turno == Turno.RESULTADO:
-                    self.juego.siguiente_ronda()
-                    self.tiempo_fase = pygame.time.get_ticks()
-                    return
-                if self.juego.turno in (Turno.JUGADOR_TIRA, Turno.JUGADOR_HECHIZOS):
-                    self._usar_carta_con_teclado()
-                    return
+                self._confirmar_foco_teclado()
+                return
 
         if evento.type == pygame.MOUSEBUTTONDOWN:
             if evento.button == 3:
-                self.hechizo_seleccionado = None
+                self._cancelar_foco_teclado()
                 return
 
             if evento.button != 1:
@@ -406,12 +515,20 @@ class EscenaJuego(Escena):
                     return
 
             if self.juego.turno == Turno.JUGADOR_TIRA:
-                for idx, rect in self.rects_jugador:
+                for idx, rect in self._cartas_mano_en_orden_de_clic():
                     if rect.collidepoint(mouse):
                         carta = self.juego.mazo_jugador[idx]
+                        self.foco_teclado = next(
+                            (pos for pos, (real, _) in enumerate(self.rects_jugador)
+                             if real == idx),
+                            self.foco_teclado,
+                        )
+                        self.foco_zona = "mano"
                         if getattr(carta, "tipo", "criatura") == "criatura":
                             self.juego.jugador_tira_carta(idx)
                             self.tiempo_fase = pygame.time.get_ticks()
+                            self.foco_zona = "mesa"
+                            self.calcular_rects()
                         break
 
             elif self.juego.turno == Turno.JUGADOR_HECHIZOS:
@@ -428,6 +545,8 @@ class EscenaJuego(Escena):
                                 )
                                 return
                         self.hechizo_seleccionado = None
+                        self.animacion_target_inicio = None
+                        self.foco_zona = "mano"
                         return
                     else:
                         self._aplicar_hechizo_directo(self.hechizo_seleccionado)
@@ -437,19 +556,29 @@ class EscenaJuego(Escena):
                 if rect_mesa is not None and rect_mesa.collidepoint(mouse):
                     self.juego.iniciar_duelo()
                     self.tiempo_fase = pygame.time.get_ticks()
+                    self.foco_zona = "mano"
                     return
 
-                for idx, rect in self.rects_jugador:
+                for idx, rect in self._cartas_mano_en_orden_de_clic():
                     if rect.collidepoint(mouse):
                         carta = self.juego.mazo_jugador[idx]
+                        self.foco_teclado = next(
+                            (pos for pos, (real, _) in enumerate(self.rects_jugador)
+                             if real == idx),
+                            self.foco_teclado,
+                        )
+                        self.foco_zona = "mano"
                         if getattr(carta, "tipo", "criatura") == "hechizo":
                             data = HECHIZOS.get(carta.hechizo_id, {})
                             target = data.get("target", "")
                             if target == "carta_rival":
-                                self.hechizo_seleccionado = idx
+                                self._seleccionar_hechizo_target(idx)
                             else:
                                 self._aplicar_hechizo_directo(idx)
                         break
+
+    def _cartas_mano_en_orden_de_clic(self):
+        return list(reversed(self.rects_jugador))
 
     def update(self, dt):
         self.render.tick(dt)
@@ -479,12 +608,17 @@ class EscenaJuego(Escena):
             mesa_img=self.mesa_img,
             reversos_img=self.reversos_img,
             posiciones_jugador=self.posiciones_jugador,
+            escalas_jugador=self.escalas_jugador,
+            foco_mano=self.foco_teclado if self.foco_zona == "mano" else None,
+            foco_objetivo=self.foco_objetivo if self.foco_zona == "objetivo" else None,
+            slots_rival_objetivo=self.slots_rival_objetivo,
             hechizo_seleccionado=self.hechizo_seleccionado,
             rects_cartas_rival_clickeables=self.rects_cartas_rival_clickeables,
             mensaje_hechizo=self._mensaje_hechizo_visible(),
             carta_vision_idx=self.juego.carta_vision_idx,
             vision_activa_hasta=self.juego.vision_activa_hasta,
             foco_teclado=self.foco_teclado,
+            factor_espaciado_rival=self._factor_espaciado_rival(),
         )
 
     def _emote_rival(self):

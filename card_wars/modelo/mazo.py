@@ -33,7 +33,7 @@ class Mazo:
         for hid in ids:
             data = HECHIZOS[hid]
             cartas.append(Carta(
-                nombre=data["nombre"],
+                nombre=data.get("nombre_carta", data["nombre"]),
                 poder=0,
                 tipo="hechizo",
                 hechizo_id=hid,

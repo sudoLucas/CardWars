@@ -170,7 +170,7 @@ class IAAdaptativa(Estrategia):
                 if juego.carta_jugada_jugador is not None:
                     criatura_j = juego.mazo_jugador[juego.carta_jugada_jugador]
                     if criatura_j.tipo == "criatura" and criatura_j.viva:
-                        criatura_j.inmovilizada = True
+                        criatura_j.recibir_golpe(data["daño_aguante"])
                         carta.morir()
                         juego.gastar_mana("enemigo", data["costo"])
                         return

@@ -131,7 +131,14 @@ Debe tomar una carta al azar de la mano del rival. La carta pasa
 a la mano del jugador. El rival pierde esa carta.
 
 ### RF-31: Hechizo Inmovilizar
-Debe impedir que la criatura rival ataque durante el turno actual.
+Debe restar 10 de aguante a la criatura rival activa. El aguante perdido
+permanece en la carta y solo puede recuperarse con Pocion de defensa.
+
+### RF-32: Prioridad de ataque por aguante
+En un duelo, la criatura con mayor aguante actual ataca primero. Si su ataque
+reduce el aguante rival a cero, gana el duelo sin recibir contraataque. Si la
+rival sobrevive, contraataca; el resultado posterior se resuelve por el poder
+de ataque, conservando el dano a HP por diferencia de poder.
 
 ### RF-32: Descarte de hechizos
 Los hechizos se descartan despues de usarse.

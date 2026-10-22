@@ -164,7 +164,7 @@ turno (pero sin superar el tope).
 | Rayo | 3 | Le hace dano a una criatura rival |
 | Debilidad | 3 | Baja el ataque de una criatura rival |
 | Robo | 3 | Roba una carta del rival |
-| Inmovilizar | 4 | La criatura rival no ataca este turno |
+| Inmovilizar | 4 | Resta 10 de aguante a la criatura rival; solo Pocion de defensa lo recupera |
 
 ---
 
@@ -174,6 +174,8 @@ Para terminar tu turno:
 
 - Hace click sobre la criatura que bajaste a la mesa.
 - La criatura va a empezar el duelo contra la del rival.
+- En el duelo, la criatura con mas aguante actual ataca primero. Si su ataque
+  derrota a la rival, esta no alcanza a contraatacar.
 
 **Tambien podes cancelar acciones con Shift** (por ejemplo, si
 elegiste un hechizo pero te arrepentis).

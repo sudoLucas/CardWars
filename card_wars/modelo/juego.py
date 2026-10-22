@@ -58,15 +58,31 @@ class Juego:
             ]
             self.mazo_enemigo.cartas = [
                 Carta("Perro", 10, tipo="criatura"),
+                Carta("Gato", 5, tipo="criatura"),
             ]
         elif self.ronda == 3:
+            self.mana_jugador = max(
+                self.mana_jugador, HECHIZOS["inmovilizar"]["costo"],
+            )
             self.mazo_jugador.cartas = [
-                Carta("Fenix", 20, tipo="criatura"),
-                Carta("Golem", 25, tipo="criatura"),
-                Carta("Titan", 20, tipo="criatura"),
+                Carta("Perro", 10, tipo="criatura"),
+                Carta("Inmovilizar", 0, tipo="hechizo",
+                      hechizo_id="inmovilizar", costo_mana=4),
             ]
             self.mazo_enemigo.cartas = [
                 Carta("Dragon", 15, tipo="criatura"),
+            ]
+        elif self.ronda == 4:
+            self.mana_jugador = max(
+                self.mana_jugador, HECHIZOS["inmovilizar"]["costo"],
+            )
+            self.mazo_jugador.cartas = [
+                Carta("Fenix", 20, tipo="criatura"),
+                Carta("Inmovilizar", 0, tipo="hechizo",
+                      hechizo_id="inmovilizar", costo_mana=4),
+            ]
+            self.mazo_enemigo.cartas = [
+                Carta("Golem", 25, tipo="criatura"),
             ]
 
     # ---------- Mana ----------
@@ -157,7 +173,10 @@ class Juego:
         if hid == "vision":
             if target_idx is None:
                 return False
-            self.carta_vision_idx = target_idx
+            objetivos = self._cartas_rivales_objetivo()
+            if not 0 <= target_idx < len(objetivos):
+                return False
+            self.carta_vision_idx = objetivos[target_idx][0]
             self.vision_activa_hasta = pygame.time.get_ticks() + 1500
             self.mensaje_hechizo = "zz Mirando una carta del rival"
             resultado = True
@@ -165,7 +184,8 @@ class Juego:
         elif hid == "robo":
             if target_idx is None:
                 return False
-            self._robar_carta_rival(target_idx)
+            if not self._robar_carta_rival(target_idx):
+                return False
             self.mensaje_hechizo = "zz Robaste una carta"
             resultado = True
 
@@ -221,8 +241,9 @@ class Juego:
         elif hid == "inmovilizar":
             criatura_e = self._criatura_jugada_enemiga()
             if criatura_e is not None:
-                criatura_e.inmovilizada = True
-                self.mensaje_hechizo = "zz Criatura rival inmovilizada"
+                dano = data["daño_aguante"]
+                criatura_e.recibir_golpe(dano)
+                self.mensaje_hechizo = f"zz -{dano} de aguante al rival"
                 resultado = True
 
         if resultado:
@@ -247,21 +268,41 @@ class Juego:
         elif target == "criatura_propia":
             if self._criatura_jugada_jugador() is None:
                 return False
+        elif target == "carta_rival":
+            if not self._cartas_rivales_objetivo():
+                return False
         return True
 
     # ---------- Fase: duelo ----------
     def iniciar_duelo(self):
         if self.turno != Turno.JUGADOR_HECHIZOS:
             return False
-        if self.carta_jugada_jugador is None or self.carta_jugada_enemigo is None:
+        if self.carta_jugada_jugador is None:
             return False
 
-        if (self.carta_jugada_jugador >= len(self.mazo_jugador.cartas)
-                or self.carta_jugada_enemigo >= len(self.mazo_enemigo.cartas)):
-            self.chequear_fin()
+        if self.carta_jugada_jugador >= len(self.mazo_jugador.cartas):
             return False
 
         carta_j = self.mazo_jugador[self.carta_jugada_jugador]
+        if not carta_j.viva:
+            self.mensaje = "zz Tu criatura ya no esta en la mesa"
+            self.turno = Turno.RESULTADO
+            self.chequear_fin()
+            return True
+
+        if self.carta_jugada_enemigo is None:
+            self.hp_enemigo -= carta_j.poder
+            self.mensaje = (
+                f"zz {carta_j.nombre} ataca directamente: "
+                f"-{carta_j.poder} HP al rival"
+            )
+            self.turno = Turno.RESULTADO
+            self.chequear_fin()
+            return True
+
+        if self.carta_jugada_enemigo >= len(self.mazo_enemigo.cartas):
+            return False
+
         carta_e = self.mazo_enemigo[self.carta_jugada_enemigo]
 
         if not carta_e.viva:
@@ -270,13 +311,15 @@ class Juego:
             self.chequear_fin()
             return True
 
-        if not carta_j.viva:
-            self.mensaje = "zz Tu criatura ya no esta en la mesa"
+        self._ia_usar_hechizos()
+        if not carta_j.viva or not carta_e.viva:
             self.turno = Turno.RESULTADO
+            if not carta_j.viva:
+                self.mensaje = f"zz {carta_j.nombre} fue derrotada antes del duelo"
+            else:
+                self.mensaje = f"zz {carta_e.nombre} fue derrotada antes del duelo"
             self.chequear_fin()
             return True
-
-        self._ia_usar_hechizos()
 
         self.turno = Turno.DUELO
         self.resolver_batalla(carta_j, carta_e)
@@ -285,22 +328,45 @@ class Juego:
         return True
 
     def resolver_batalla(self, carta_j, carta_e):
-        if carta_j.poder > carta_e.poder:
-            dano = carta_j.poder - carta_e.poder
-            carta_e.recibir_golpe(carta_j.poder)
-            self.hp_enemigo -= dano
-            self.mensaje = (f"zz {carta_j.nombre} ({carta_j.poder}) vence a "
-                            f"{carta_e.nombre} ({carta_e.poder}) - {dano} HP al rival")
-        elif carta_e.poder > carta_j.poder:
-            dano = carta_e.poder - carta_j.poder
+        if carta_j.aguante == carta_e.aguante:
             carta_j.recibir_golpe(carta_e.poder)
-            self.hp_jugador -= dano
-            self.mensaje = (f"zz {carta_e.nombre} ({carta_e.poder}) vence a "
-                            f"{carta_j.nombre} ({carta_j.poder}) - {dano} HP a ti")
+            carta_e.recibir_golpe(carta_j.poder)
         else:
-            carta_j.morir()
-            carta_e.morir()
+            primero, segundo = (
+                (carta_j, carta_e)
+                if carta_j.aguante > carta_e.aguante
+                else (carta_e, carta_j)
+            )
+            segundo.recibir_golpe(primero.poder)
+            if segundo.viva:
+                primero.recibir_golpe(segundo.poder)
+
+        if not carta_j.viva and not carta_e.viva:
             self.mensaje = "zz Empate: las cartas se mataron"
+        elif carta_j.viva and not carta_e.viva:
+            self._registrar_ganador(carta_j, carta_e, "rival")
+        elif carta_e.viva and not carta_j.viva:
+            self._registrar_ganador(carta_e, carta_j, "jugador")
+        elif carta_j.poder > carta_e.poder:
+            self._registrar_ganador(carta_j, carta_e, "rival")
+        elif carta_e.poder > carta_j.poder:
+            self._registrar_ganador(carta_e, carta_j, "jugador")
+        else:
+            self.mensaje = "zz Empate: las cartas resistieron el duelo"
+
+    def _registrar_ganador(self, ganadora, perdedora, lado_perdedor):
+        dano_hp = max(0, ganadora.poder - perdedora.poder)
+        if lado_perdedor == "rival":
+            self.hp_enemigo -= dano_hp
+            detalle = f" - {dano_hp} HP al rival" if dano_hp else ""
+        else:
+            self.hp_jugador -= dano_hp
+            detalle = f" - {dano_hp} HP a ti" if dano_hp else ""
+
+        self.mensaje = (
+            f"zz {ganadora.nombre} ({ganadora.poder}) vence a "
+            f"{perdedora.nombre} ({perdedora.poder}){detalle}"
+        )
 
     # ---------- IA usa hechizos ----------
     def _ia_usar_hechizos(self):
@@ -335,15 +401,38 @@ class Juego:
         return c
 
     def _robar_carta_rival(self, target_idx):
-        vivas_e = [(i, c) for i, c in enumerate(self.mazo_enemigo.cartas) if c.viva]
-        if not vivas_e:
-            return
-        if target_idx is None:
-            target_idx = 0
-        target_idx = max(0, min(target_idx, len(vivas_e) - 1))
-        idx_real, carta = vivas_e[target_idx]
+        objetivos = self._cartas_rivales_objetivo()
+        if not 0 <= target_idx < len(objetivos):
+            return False
+
+        idx_real, carta = objetivos[target_idx]
+        carta_activa = None
+        if (self.carta_jugada_enemigo is not None
+                and 0 <= self.carta_jugada_enemigo < len(self.mazo_enemigo.cartas)):
+            carta_activa = self.mazo_enemigo[self.carta_jugada_enemigo]
         self.mazo_enemigo.cartas.pop(idx_real)
         self.mazo_jugador.cartas.append(carta)
+
+        if carta is carta_activa:
+            self.carta_jugada_enemigo = next(
+                (
+                    i for i, candidata in enumerate(self.mazo_enemigo.cartas)
+                    if candidata.viva
+                    and getattr(candidata, "tipo", "criatura") == "criatura"
+                ),
+                None,
+            )
+        elif carta_activa in self.mazo_enemigo.cartas:
+            self.carta_jugada_enemigo = self.mazo_enemigo.cartas.index(carta_activa)
+        return True
+
+    def _cartas_rivales_objetivo(self):
+        """Cartas vivas rivales elegibles, excluyendo la criatura ya bajada."""
+        return [
+            (indice, carta)
+            for indice, carta in enumerate(self.mazo_enemigo.cartas)
+            if carta.viva and indice != self.carta_jugada_enemigo
+        ]
 
     # ---------- Avanzar ronda ----------
     def siguiente_ronda(self):

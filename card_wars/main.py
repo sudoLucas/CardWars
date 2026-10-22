@@ -9,6 +9,7 @@ from config import (
 )
 from vista.fuentes import cargar_fuentes
 from vista.render import Render
+from vista.colores import COLOR_FONDO_BARRA
 from escenas.menu import EscenaMenu
 from modelo.progreso import Progreso
 
@@ -29,7 +30,8 @@ class App:
 
         self.surface_mundo = pygame.Surface(
             (self.ancho_interno // ESCALA_PIXEL,
-             self.alto_interno // ESCALA_PIXEL)
+             self.alto_interno // ESCALA_PIXEL),
+            pygame.SRCALPHA,
         )
         self.surface_ui = pygame.Surface(
             (self.ancho_interno, self.alto_interno),
@@ -106,7 +108,12 @@ class App:
                 self.escena.handle_event(evento, mouse)
 
             self.escena.update(dt)
+            self.render.fondo_tablero = None
             self.escena.draw()
+
+            self.surface_frame.fill(COLOR_FONDO_BARRA)
+            if self.render.fondo_tablero is not None:
+                self.surface_frame.blit(self.render.fondo_tablero, (0, 0))
 
             mundo_escalado = pygame.transform.scale(
                 self.surface_mundo,
