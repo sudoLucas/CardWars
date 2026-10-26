@@ -20,28 +20,22 @@ RUTA_COLINA_FRENTE = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina
 RUTA_COLINA_MEDIO  = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina2.png")
 RUTA_COLINA_FONDO  = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "colina3.png")
 
+RUTA_MUSICA_MENU   = os.path.join(DIRECTORIO_RAIZ, "assets", "sfx", "menuOL.mp3")
+
 
 # ============================================================
 # AJUSTES DE LAS COLINAS (todos en 0, ajustar a mano)
 # ============================================================
-# ZOOM: 1.0 = tamano original. 1.5 = 50% mas grande. 0.8 = 20% mas chica.
-# VELOCIDAD: 0.0 = quieta. 0.0002 = lenta. 0.0010 = rapida.
-# OFFSET_X: positivo = mueve a la DERECHA. negativo = mueve a la IZQUIERDA.
-# OFFSET_Y: positivo = mueve hacia ABAJO. negativo = mueve hacia ARRIBA.
-
-# --- Capa FONDO (colina3, la mas lejana) ---
 FONDO_ZOOM        = 1.25
 FONDO_VELOCIDAD   = 0.0001
 FONDO_OFFSET_X    = 0
 FONDO_OFFSET_Y    = 0
 
-# --- Capa MEDIO (colina2) ---
 MEDIO_ZOOM        = 1.25
 MEDIO_VELOCIDAD   = 0.0002
 MEDIO_OFFSET_X    = 25
 MEDIO_OFFSET_Y    = -100
 
-# --- Capa FRENTE (colina1, la mas cercana) ---
 FRENTE_ZOOM       = 1.5
 FRENTE_VELOCIDAD  = 0.00009
 FRENTE_OFFSET_X   = 0
@@ -99,6 +93,17 @@ class EscenaMenu(Escena):
             print(f"[menu] Imagen NO ENCONTRADA: {ruta}")
         return None
 
+    # ============================================================
+    # CICLO DE VIDA DE LA ESCENA (para la musica)
+    # ============================================================
+    def on_enter(self):
+        # Usamos el metodo de la App para que no se corte si ya esta sonando
+        self.app.cambiar_musica(RUTA_MUSICA_MENU)
+
+    def on_exit(self):
+        # No frenamos la musica aca, para que siga sonando en las otras pantallas
+        pass
+
     def handle_event(self, evento, mouse):
         self.hover = None
         for i, (clave, _, rect) in enumerate(self.botones):
@@ -127,7 +132,6 @@ class EscenaMenu(Escena):
 
     def _accion(self, clave):
         if clave == "jugar":
-            # Va a la pantalla de seleccion de niveles
             from escenas.niveles import EscenaNiveles
             self.app.cambiar_escena(EscenaNiveles(self.app))
         elif clave == "dificultad":
@@ -161,7 +165,6 @@ class EscenaMenu(Escena):
         self.render.ui.blit(img_zoom, (x_final, y_final))
 
     def _dibujar_fondo(self):
-        # Colina3 primero (queda atras)
         self._dibujar_capa(
             self.capa_fondo,
             zoom=FONDO_ZOOM,
@@ -170,7 +173,6 @@ class EscenaMenu(Escena):
             offset_x=FONDO_OFFSET_X,
             offset_y=FONDO_OFFSET_Y,
         )
-        # Colina2 despues
         self._dibujar_capa(
             self.capa_medio,
             zoom=MEDIO_ZOOM,
@@ -179,7 +181,6 @@ class EscenaMenu(Escena):
             offset_x=MEDIO_OFFSET_X,
             offset_y=MEDIO_OFFSET_Y,
         )
-        # Colina1 ultimo (queda adelante)
         self._dibujar_capa(
             self.capa_frente,
             zoom=FRENTE_ZOOM,
@@ -203,8 +204,6 @@ class EscenaMenu(Escena):
             TITULO, self.fuentes["grande"], AMARILLO,
             x_texto, 14
         )
-
-
 
         for i, (clave, texto, rect) in enumerate(self.botones):
             seleccionado = (i == self.indice)
@@ -239,7 +238,6 @@ class EscenaMenu(Escena):
                         self.render.ui, BLANCO,
                         (x_sub, y_sub, ancho_actual, 3)
                     )
-
 
     def update(self, dt):
         self.app.tiempo_fondo += dt

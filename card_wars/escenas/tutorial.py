@@ -12,7 +12,8 @@ from modelo.juego import Juego
 
 DELAY_IA_TIRA = 800
 
-# Rutas de imagenes
+# Rutas de imagenes y sonidos
+RUTA_MUSICA_TUTORIAL = os.path.join(DIRECTORIO_RAIZ, "assets", "sfx", "tutorialSL.mp3")
 RUTA_HP = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "HP.png")
 RUTA_MESA = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "mesa.png")
 CARPETA_REVERSOS = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "Objetos", "cartas")
@@ -47,7 +48,7 @@ class EscenaTutorial(Escena):
         # --- Cargar imagenes para que el render se vea igual que en el juego ---
         self.hp_img = self._cargar(RUTA_HP)
         self.mesa_img = self._cargar(RUTA_MESA)
-        
+
         # Elegir 3 reversos random
         numeros = [1, 2, 3] 
         self.reversos_img = []
@@ -74,6 +75,10 @@ class EscenaTutorial(Escena):
         )
 
         self._calcular_rects()
+
+    def on_enter(self):
+        """Arranca la musica del tutorial al entrar."""
+        self.app.cambiar_musica(RUTA_MUSICA_TUTORIAL)
 
     def _cargar(self, ruta):
         if os.path.isfile(ruta):
@@ -405,7 +410,6 @@ class EscenaTutorial(Escena):
             return None
         
         e = ESCALA_PIXEL
-        # La carta en duelo está en el centro
         cx_duelo = (ANCHO // e) // 2
         cy_duelo = Layout.Y_CENTRO_DUELO
         
@@ -474,9 +478,9 @@ class EscenaTutorial(Escena):
             emote_jugador=None,
             emote_activo=False,
             quien_recibio_dano=None,
-            hp_img=self.hp_img,         # <--- Pasamos la imagen
-            mesa_img=self.mesa_img,     # <--- Pasamos la imagen
-            reversos_img=self.reversos_img, # <--- Pasamos los reversos
+            hp_img=self.hp_img,
+            mesa_img=self.mesa_img,
+            reversos_img=self.reversos_img,
             posiciones_jugador=self.posiciones_jugador,
             escalas_jugador=self.escalas_jugador,
             foco_mano=self.foco_teclado if self.foco_zona == "mano" else None,

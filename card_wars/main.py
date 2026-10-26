@@ -1,5 +1,6 @@
 # main.py
 import sys
+import os
 import pygame
 
 import config
@@ -7,9 +8,9 @@ from config import (
     TITULO, VERSION, FPS, DIFICULTAD_DEFAULT, ESCALA_PIXEL,
     RESOLUCION_INTERNA_W, RESOLUCION_INTERNA_H,
 )
+from vista.colores import COLOR_FONDO_BARRA
 from vista.fuentes import cargar_fuentes
 from vista.render import Render
-from vista.colores import COLOR_FONDO_BARRA
 from escenas.menu import EscenaMenu
 from modelo.progreso import Progreso
 
@@ -17,6 +18,12 @@ from modelo.progreso import Progreso
 class App:
     def __init__(self):
         pygame.init()
+
+        # Inicializar el sistema de audio
+        try:
+            pygame.mixer.init()
+        except Exception as e:
+            print(f"[audio] No se pudo inicializar el audio: {e}")
 
         self.ancho_ventana, self.alto_ventana = config.inicializar_ventana()
         self.ventana = pygame.display.set_mode(
@@ -53,6 +60,9 @@ class App:
         # --- Progreso persistente ---
         self.progreso = Progreso()
 
+        # --- Estado de la musica ---
+        self.musica_actual = None
+
         self.escena = None
         self.cambiar_escena(EscenaMenu(self))
 
@@ -72,19 +82,46 @@ class App:
     def _mouse_interno(self):
         return self._pos_interna(pygame.mouse.get_pos())
 
+    # ============================================================
+    # CONTROL DE MUSICA
+    # ============================================================
+    def cambiar_musica(self, ruta_musica):
+        """Cambia la musica de fondo. Si ya esta sonando esa misma, no hace nada."""
+        if not os.path.isfile(ruta_musica):
+            print(f"[audio] Musica NO ENCONTRADA: {ruta_musica}")
+            return
+
+        # Si ya está sonando la misma canción, no la cortamos
+        if self.musica_actual == ruta_musica and pygame.mixer.music.get_busy():
+            return
+
+        try:
+            pygame.mixer.music.load(ruta_musica)
+            pygame.mixer.music.set_volume(0.5)
+            pygame.mixer.music.play(-1)  # -1 = loop infinito
+            self.musica_actual = ruta_musica
+        except Exception as e:
+            print(f"[audio] Error al cambiar musica: {e}")
+
+    def parar_musica(self):
+        try:
+            pygame.mixer.music.stop()
+            self.musica_actual = None
+        except Exception:
+            pass
+
     def desbloquear_siguiente_nivel(self, dificultad, nivel_actual):
         """Desbloquea el nivel que sigue al actual (si existe)."""
         if nivel_actual is None:
             return
 
-        # Extraer numero del nivel (nivel1 -> 1)
         try:
             num = int(nivel_actual.replace("nivel", ""))
         except ValueError:
             return
 
         siguiente = f"nivel{num + 1}"
-        max_nivel = 3  # por ahora hay 3 niveles
+        max_nivel = 3
 
         if num < max_nivel:
             self.progreso.desbloquear(dificultad, siguiente)
