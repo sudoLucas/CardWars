@@ -11,9 +11,10 @@ from escenas.base import Escena
 from modelo.juego import Juego
 
 
+
 CARPETA_EMOTES = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "emotes")
 RUTA_HP = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "HP.png")
-RUTA_MESA = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "mesa.png")
+RUTA_MESA = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "panio.png")
 CARPETA_REVERSOS = os.path.join(
     DIRECTORIO_RAIZ, "assets", "imagenes", "Objetos", "cartas"
 )

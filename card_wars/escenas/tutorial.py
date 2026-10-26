@@ -15,7 +15,7 @@ DELAY_IA_TIRA = 800
 # Rutas de imagenes y sonidos
 RUTA_MUSICA_TUTORIAL = os.path.join(DIRECTORIO_RAIZ, "assets", "sfx", "tutorialSL.mp3")
 RUTA_HP = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "HP.png")
-RUTA_MESA = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "mesa.png")
+RUTA_MESA = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "panio.png")
 CARPETA_REVERSOS = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "Objetos", "cartas")
 
 
