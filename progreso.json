@@ -1,0 +1,13 @@
+{
+  "facil": [
+    "nivel1"
+  ],
+  "normal": [
+    "nivel1",
+    "nivel2",
+    "nivel3"
+  ],
+  "duro": [
+    "nivel1"
+  ]
+}

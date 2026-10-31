@@ -143,91 +143,40 @@ class Layout:
         return posiciones
 
     @classmethod
-    def distribucion_mano(cls, cartas, ancho_mundo, alto_mundo,
-                          reservar_hueco=False):
+    def distribucion_mano(cls, cartas, ancho_mundo, alto_mundo, reservar_hueco=False):
         cantidad = len(cartas)
         if cantidad == 0:
             return [], []
 
-        escalas_base = [cls.escala_carta_mano(carta) for carta in cartas]
-        espacio = 2
-        if reservar_hueco:
-            borde_izquierdo = 6
-            borde_derecho = ancho_mundo - 46
-            ancho_hueco = cls.CARTA_W + 12
-            centro = ancho_mundo / 2
-            fin_izquierda = centro - ancho_hueco / 2
-            inicio_derecha = centro + ancho_hueco / 2
-            ancho_izquierda = fin_izquierda - borde_izquierdo
-            ancho_derecha = borde_derecho - inicio_derecha
-
-            mejor = None
-            for cantidad_izquierda in range(cantidad + 1):
-                cantidad_derecha = cantidad - cantidad_izquierda
-                ancho_req_izquierda = sum(
-                    cls.CARTA_W * escala
-                    for escala in escalas_base[:cantidad_izquierda]
-                ) + espacio * max(0, cantidad_izquierda - 1)
-                ancho_req_derecha = sum(
-                    cls.CARTA_W * escala
-                    for escala in escalas_base[cantidad_izquierda:]
-                ) + espacio * max(0, cantidad_derecha - 1)
-
-                ajuste_izquierda = (
-                    ancho_izquierda / ancho_req_izquierda
-                    if ancho_req_izquierda else 1
-                )
-                ajuste_derecha = (
-                    ancho_derecha / ancho_req_derecha
-                    if ancho_req_derecha else 1
-                )
-                ajuste = min(1, ajuste_izquierda, ajuste_derecha)
-                clave = (ajuste, -abs(cantidad_izquierda - cantidad / 2))
-                if mejor is None or clave > mejor[0]:
-                    mejor = (
-                        clave, cantidad_izquierda,
-                        [escala * ajuste for escala in escalas_base],
-                    )
-
-            _, cantidad_izquierda, escalas = mejor
-            anchos = [cls.CARTA_W * escala for escala in escalas]
-            centro_y = alto_mundo - 18 - max(
-                cls.CARTA_H * escala for escala in escalas
-            ) / 2
-            posiciones = []
-
-            for inicio, fin, desde, hasta in (
-                (borde_izquierdo, fin_izquierda, 0, cantidad_izquierda),
-                (inicio_derecha, borde_derecho, cantidad_izquierda, cantidad),
-            ):
-                grupo_anchos = anchos[desde:hasta]
-                ancho_grupo = sum(grupo_anchos) + espacio * max(
-                    0, len(grupo_anchos) - 1,
-                )
-                x = inicio + (fin - inicio - ancho_grupo) / 2
-                for ancho in grupo_anchos:
-                    posiciones.append((x + ancho / 2, centro_y, 0))
-                    x += ancho + espacio
-            return posiciones, escalas
-
-        ancho_util = max(1, ancho_mundo - 54)
-        ancho_total_base = sum(
-            cls.CARTA_W * escala for escala in escalas_base
-        )
-        ancho_cartas_util = ancho_util - espacio * (cantidad - 1)
-        ajuste = min(1, ancho_cartas_util / ancho_total_base)
-        escalas = [escala * ajuste for escala in escalas_base]
-        anchos = [cls.CARTA_W * escala for escala in escalas]
-        ancho_total = sum(anchos) + espacio * (cantidad - 1)
-        x = (ancho_mundo - 46 - ancho_total) / 2
-        centro_y = alto_mundo - 18 - max(
-            cls.CARTA_H * escala for escala in escalas
-        ) / 2
+        escalas = [cls.escala_carta_mano(c) for c in cartas]
+        
+        # Ancho base y espaciado (ajustá estos valores si querés que estén más juntas o separadas)
+        ancho_base = cls.CARTA_W
+        espaciado = cls.ABANICO_SEP_X_JUGADOR 
+        
+        # Si hay una carta seleccionada (reservar_hueco), sumamos espacio extra para el "hueco"
+        ancho_extra_hueco = 20 if reservar_hueco else 0
+        
+        # Calculamos el ancho total que ocupa la mano
+        ancho_total = sum(int(ancho_base * e) for e in escalas) + (espaciado * (cantidad - 1)) + ancho_extra_hueco
+        
+        # Empezamos a dibujar desde la izquierda para que no se muevan todas al centro
+        x_actual = (ancho_mundo - ancho_total) // 2
+        y_base = alto_mundo - 2 - int(cls.CARTA_H * escalas[0] * 0.5)
 
         posiciones = []
-        for ancho in anchos:
-            posiciones.append((x + ancho / 2, centro_y, 0))
-            x += ancho + espacio
+        for i in range(cantidad):
+            w_carta = int(ancho_base * escalas[i])
+            cx = x_actual + w_carta // 2
+            posiciones.append((cx, y_base, 0))
+            
+            # Avanzamos para la siguiente carta
+            x_actual += w_carta + espaciado
+            
+            # Si la carta actual es la seleccionada, agregamos el espacio extra antes de la próxima
+            if reservar_hueco and i == reservar_hueco:
+                x_actual += ancho_extra_hueco
+
         return posiciones, escalas
 
     @classmethod
@@ -419,36 +368,36 @@ DIFICULTAD_DURO = ConfigDificultad(
 # ============================================================
 TUTORIAL_ROUNDS = 4
 
-# Textos por ronda (con zz adelante)
+# Textos por ronda
 DIALOGOS_TUTORIAL = {
     1: [
-        "zz Cada criatura tiene fuerza y vida (o aguante). La fuerza indica cuanto dano hace; la vida, cuanto puede resistir.",
-        "zz Pasa el cursor por una carta para ver sus valores. El numero grande es la fuerza; la barra inferior muestra su vida actual.",
-        "zz La criatura rival ya esta en la mesa. Baja una criatura de tu mano para enfrentarte a ella.",
-        "zz Con la criatura en la mesa, podes revisar sus datos antes de decidir si iniciar el duelo.",
-        "zz En este primer cruce, Perro tiene fuerza y vida 10; Gato y Slime tienen 5. Proba bajar Perro y luego inicia el duelo.",
-        "zz Si una criatura golpea primero y su fuerza alcanza la vida rival, la derrota antes de recibir un contraataque.",
+        "Cada criatura tiene fuerza y vida (o aguante). La fuerza indica cuanto dano hace; la vida, cuanto puede resistir.",
+        "Pasa el cursor por una carta para ver sus valores. El numero grande es la fuerza; la barra inferior muestra su vida actual.",
+        "La criatura rival ya esta en la mesa. Baja una criatura de tu mano para enfrentarte a ella.",
+        "Con la criatura en la mesa, podes revisar sus datos antes de decidir si iniciar el duelo.",
+        "En este primer cruce, Perro tiene fuerza y vida 10; Gato y Slime tienen 5. Proba bajar Perro y luego inicia el duelo.",
+        "Si una criatura golpea primero y su fuerza alcanza la vida rival, la derrota antes de recibir un contraataque.",
     ],
     2: [
-        "zz Ahora hay dos hechizos para probar: Vision y Robo. Los hechizos cuestan mana; el frasco muestra cuanto tenes.",
-        "zz Vision revela por un momento una carta rival. Seleccionala y despues elegi una carta elegible; la criatura en mesa no se puede elegir.",
-        "zz Cuando termines de mirar, proba Robo: elegi esa otra carta rival y la sumaras a tu mazo.",
-        "zz El mana se recupera y aumenta un poco al comenzar cada ronda. Podes usar mas de un hechizo si te alcanza.",
-        "zz Cuando quieras cerrar la ronda, inicia el duelo con tu criatura.",
+        "Ahora hay dos hechizos para probar: Vision y Robo. Los hechizos cuestan mana; el frasco muestra cuanto tenes.",
+        "Vision revela por un momento una carta rival. Seleccionala y despues elegi una carta elegible; la criatura en mesa no se puede elegir.",
+        "Cuando termines de mirar, proba Robo: elegi esa otra carta rival y la sumaras a tu mazo.",
+        "El mana se recupera y aumenta un poco al comenzar cada ronda. Podes usar mas de un hechizo si te alcanza.",
+        "Cuando quieras cerrar la ronda, inicia el duelo con tu criatura.",
     ],
     3: [
-        "zz Hagamos una prueba de aguante. Tu Perro tiene fuerza 10 y vida 10; el Dragon rival, fuerza 15 y vida 15.",
-        "zz Inmovilizar le quita 10 de vida actual al Dragon: queda con 5. Su fuerza sigue siendo 15.",
-        "zz La prioridad depende de la vida actual: tu Perro tiene 10 y el Dragon 5, asi que Perro golpea primero.",
-        "zz Sus 10 de fuerza alcanzan para quitar los 5 de vida que le quedan al Dragon. Al caer antes, el Dragon no llega a contraatacar.",
-        "zz Baja a Perro, usa Inmovilizar sobre el Dragon y despues inicia el duelo. Esta vez el hechizo es parte de la jugada.",
+        "Hagamos una prueba de aguante. Tu Perro tiene fuerza 10 y vida 10; el Dragon rival, fuerza 15 y vida 15.",
+        "Inmovilizar le quita 10 de vida actual al Dragon: queda con 5. Su fuerza sigue siendo 15.",
+        "La prioridad depende de la vida actual: tu Perro tiene 10 y el Dragon 5, asi que Perro golpea primero.",
+        "Sus 10 de fuerza alcanzan para quitar los 5 de vida que le quedan al Dragon. Al caer antes, el Dragon no llega a contraatacar.",
+        "Baja a Perro, usa Inmovilizar sobre el Dragon y despues inicia el duelo. Esta vez el hechizo es parte de la jugada.",
     ],
     4: [
-        "zz Repetimos la idea con valores mayores: tu Fenix tiene fuerza y vida 20; el Golem rival, 25.",
-        "zz Inmovilizar deja al Golem con 15 de vida, pero conserva sus 25 de fuerza.",
-        "zz Fenix tiene 20 de vida frente a 15: vuelve a tener prioridad. Sus 20 de fuerza alcanzan para derrotar al Golem antes del contraataque.",
-        "zz Baja a Fenix, usa Inmovilizar sobre el Golem y confirma el resultado iniciando el duelo.",
-        "zz La regla no depende de que sean numeros chicos: compara la vida actual para saber quien actua primero y la fuerza para saber si ese golpe alcanza.",
+        "Repetimos la idea con valores mayores: tu Fenix tiene fuerza y vida 20; el Golem rival, 25.",
+        "Inmovilizar deja al Golem con 15 de vida, pero conserva sus 25 de fuerza.",
+        "Fenix tiene 20 de vida frente a 15: vuelve a tener prioridad. Sus 20 de fuerza alcanzan para derrotar al Golem antes del contraataque.",
+        "Baja a Fenix, usa Inmovilizar sobre el Golem y confirma el resultado iniciando el duelo.",
+        "La regla no depende de que sean numeros chicos: compara la vida actual para saber quien actua primero y la fuerza para saber si ese golpe alcanza.",
     ],
 }
 

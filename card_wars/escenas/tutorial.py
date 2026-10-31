@@ -63,9 +63,9 @@ class EscenaTutorial(Escena):
         alto_m = ALTO // ESCALA_PIXEL
         
         PANEL_W_M = 70
-        PANEL_H_M = 78
+        PANEL_H_M = 65
         PANEL_X_M = 5
-        PANEL_Y_M = 5
+        PANEL_Y_M = 45
         
         self.panel_rect = pygame.Rect(
             PANEL_X_M * ESCALA_PIXEL,

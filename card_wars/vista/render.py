@@ -313,18 +313,20 @@ class Render:
                     int(ancho_barra * carta.aguante / max_ag)
                     if max_ag > 0 else 0
                 )
-                barra_y = oy + h_draw - 5
+                # Barra de vida bien abajo
+                barra_y = oy + h_draw - 6
                 pygame.draw.rect(
                     surf, COLOR_FONDO_BARRA,
-                    (ox + 4, barra_y, ancho_barra, 2),
+                    (ox + 4, barra_y, ancho_barra, 4),
                 )
                 pygame.draw.rect(
                     surf, COLOR_AGUANTE,
-                    (ox + 4, barra_y, ancho_actual, 2),
+                    (ox + 4, barra_y, ancho_actual, 4),
                 )
+                # Texto de vida un poco más arriba para que no pise la barra
                 texto_ajustado(
                     f"{carta.aguante}/{max_ag}", COLOR_AGUANTE,
-                    centro_x, oy + h_draw - 13, w_draw - 6,
+                    centro_x, oy + h_draw - 20, w_draw - 6,
                 )
             else:
                 cxm = ox + w_draw // 2
@@ -527,89 +529,70 @@ class Render:
     # ==================================================
     # HP
     # ==================================================
-    def dibujar_hp(self, x_m, y_m, hp, hp_max, etiqueta, color, w_m, h_m):
-        pygame.draw.rect(self.mundo, COLOR_FONDO_BARRA, (x_m, y_m, w_m, h_m))
-        ancho = max(0, int(w_m * hp / hp_max))
-        if ancho > 0:
-            pygame.draw.rect(self.mundo, color, (x_m, y_m, ancho, h_m))
-        pygame.draw.rect(self.mundo, BLANCO, (x_m, y_m, w_m, h_m), 1)
 
-        self._texto_centrado_mundo(f"{etiqueta}: {max(0, hp)}",
-                                   self.f["mini"], BLANCO,
-                                   x_m + w_m // 2, y_m + h_m // 2 - 3)
-
-    def dibujar_barra_hp(self, x, y, hp, hp_max, hp_img, color_lleno):
-        if hp_img is None:
+    def dibujar_puntos_hp(self, cx, cy, hp, hp_max, color_lleno,
+                          cantidad=5, radio=5, radio_arco=75,
+                          apertura_grados=90.0, grosor=2, angulo_centro=-45.0):
+        if hp_max <= 0:
             return
 
-        w, h = hp_img.get_size()
+        # --- BOOST DE SATURACIÓN Y BRILLO ---
+        # Aumentamos el canal máximo y bajamos el mínimo para saturar
+        r, g, b = color_lleno
+        max_c = max(r, g, b)
+        min_c = min(r, g, b)
+        
+        # Si el color es rojo (r es el mayor)
+        if r == max_c:
+            r = min(255, int(r * 1.15) + 10)
+            g = max(0, int(g * 0.8))
+            b = max(0, int(b * 0.8))
+        # Si el color es azul (b es el mayor)
+        elif b == max_c:
+            b = min(255, int(b * 1.15) + 10)
+            r = max(0, int(r * 0.8))
+            g = max(0, int(g * 0.8))
+            
+        color_brillante = (r, g, b)
+        color_glow = (r, g, b, 80) # Halo semitransparente
 
-        FACTOR_ANCHO = 1.0
-        FACTOR_ALTO = 0.12
-        SEPARACION = 0
-        MARGEN_IZQ = 150
-        MARGEN_DER = 80
+        mitad = apertura_grados / 2.0
+        ang_ini = angulo_centro - mitad
+        ang_fin = angulo_centro + mitad
 
-        ancho_util = w - MARGEN_IZQ - MARGEN_DER
-        slot_w = ancho_util // 5
-        slot_h = h
+        hp_por_punto = hp_max / cantidad
 
-        ancho_cuadro = int(slot_w * FACTOR_ANCHO)
-        alto_cuadro = int(slot_h * FACTOR_ALTO)
+        for i in range(cantidad):
+            if cantidad == 1:
+                ang = angulo_centro
+            else:
+                t = i / (cantidad - 1)
+                ang = ang_ini + (ang_fin - ang_ini) * t
 
-        offset_x_cuadro = (slot_w - ancho_cuadro) // 2
-        offset_y_cuadro = (slot_h - alto_cuadro) // 2
+            rad = math.radians(ang)
+            px = cx + math.cos(rad) * radio_arco
+            py = cy + math.sin(rad) * radio_arco
 
-        hp_por_cuadro = hp_max / 5.0 if hp_max > 0 else 0
-        if hp_por_cuadro <= 0:
-            return
+            hp_ini = i * hp_por_punto
+            hp_restante = hp - hp_ini
 
-        cuadros_llenos = int(hp // hp_por_cuadro)
-        cuadros_llenos = max(0, min(5, cuadros_llenos))
+            # Dibujar halo de fondo si el punto está lleno o parcial
+            if hp_restante > 0:
+                surf_glow = pygame.Surface((radio*4, radio*4), pygame.SRCALPHA)
+                pygame.draw.circle(surf_glow, color_glow, (radio*2, radio*2), radio*1.5)
+                self.ui.blit(surf_glow, (int(px) - radio*2, int(py) - radio*2))
 
-        cuadros_con_hp = math.ceil(hp / hp_por_cuadro)
-        cuadros_con_hp = max(0, min(5, cuadros_con_hp))
-
-        capa = pygame.Surface((w, h), pygame.SRCALPHA)
-
-        for i in range(cuadros_llenos):
-            x_cuadro = (
-                MARGEN_IZQ
-                + i * (slot_w + SEPARACION)
-                + offset_x_cuadro
-            )
-            rect_cuadro = pygame.Rect(
-                x_cuadro, offset_y_cuadro, ancho_cuadro, alto_cuadro
-            )
-            capa.fill(color_lleno, rect_cuadro)
-
-        if cuadros_llenos < cuadros_con_hp:
-            i = cuadros_llenos
-
-            hp_restante = hp - (cuadros_llenos * hp_por_cuadro)
-            fraccion = hp_restante / hp_por_cuadro
-            fraccion = max(0.0, min(1.0, fraccion))
-
-            bordo = (60, 0, 0)
-            r = int(bordo[0] + (color_lleno[0] - bordo[0]) * fraccion)
-            g = int(bordo[1] + (color_lleno[1] - bordo[1]) * fraccion)
-            b = int(bordo[2] + (color_lleno[2] - bordo[2]) * fraccion)
-            color_cuadro = (r, g, b)
-
-            ancho_pintado = int(ancho_cuadro * fraccion)
-            if ancho_pintado > 0:
-                x_cuadro = (
-                    MARGEN_IZQ
-                    + i * (slot_w + SEPARACION)
-                    + offset_x_cuadro
-                )
-                rect_parcial = pygame.Rect(
-                    x_cuadro, offset_y_cuadro, ancho_pintado, alto_cuadro
-                )
-                capa.fill(color_cuadro, rect_parcial)
-
-        capa.blit(hp_img, (0, 0))
-        self.ui.blit(capa, (x, y))
+            if hp_restante >= hp_por_punto:
+                pygame.draw.circle(self.ui, color_brillante, (int(px), int(py)), radio)
+            elif hp_restante <= 0:
+                pygame.draw.circle(self.ui, color_lleno, (int(px), int(py)), radio, grosor)
+            else:
+                frac = hp_restante / hp_por_punto
+                surf = pygame.Surface((radio * 2 + 2, radio * 2 + 2), pygame.SRCALPHA)
+                alpha = int(255 * frac)
+                pygame.draw.circle(surf, (*color_brillante, alpha), (radio + 1, radio + 1), radio)
+                self.ui.blit(surf, (int(px) - radio - 1, int(py) - radio - 1))
+                pygame.draw.circle(self.ui, color_brillante, (int(px), int(py)), radio, 1)
 
     # ==================================================
     # MANA
@@ -709,7 +692,7 @@ class Render:
     # ESCENA COMPLETA
     # ==================================================
     def dibujar_escena(self, juego, rects_jugador, rects_enemigo, mouse,
-                       btn_reiniciar, btn_siguiente,
+                       btn_reiniciar, btn_siguiente, btn_siguiente_nivel=None,
                        emote_rival=None, emote_jugador=None,
                        emote_activo=False, quien_recibio_dano=None,
                        hp_img=None, mesa_img=None, reversos_img=None,
@@ -739,48 +722,36 @@ class Render:
         ancho_m = self.mundo.get_width()
         alto_m = self.mundo.get_height()
 
-        # --- HP con HP.png ---
-        if hp_img is not None:
-            ancho_orig, alto_orig = hp_img.get_size()
-            escala_hp = 1
-            ancho_hp = int(ancho_orig * escala_hp)
-            alto_hp = int(alto_orig * escala_hp)
-            hp_img_chica = pygame.transform.smoothscale(
-                hp_img, (ancho_hp, alto_hp)
-            )
+        # --- HP con puntos minimalistas en arco diagonal ---
+        TAM_NORMAL = 140
+        TAM_AGRANDADO = 200
+        MARGEN_X = 10
+        MARGEN_Y_BASE = 50
+        
+        tam = TAM_AGRANDADO if emote_activo else TAM_NORMAL
+        offset_flote = math.sin(self.tiempo * 0.002) * 6
 
-            RIVAL_X_BASE = 10
-            RIVAL_Y_BASE = 30
-            JUGADOR_X_MARGEN_DER = 10
-            JUGADOR_Y_BASE = 70
+        # Rival: Pivote en el centro del emote, arco apuntando hacia arriba-derecha (-45°)
+        rival_cx = MARGEN_X + tam // 2
+        rival_cy = MARGEN_Y_BASE + tam // 2 + int(offset_flote)
+        self.dibujar_puntos_hp(
+            rival_cx, rival_cy,
+            juego.hp_enemigo, juego.hp_enemigo_max,
+            (220, 40, 40),          # Rojo base
+            cantidad=6, radio=5, radio_arco=75,
+            angulo_centro=-45.0     # <-- Abarca de abajo-izq a arriba-der
+        )
 
-            AMPLITUD_X = 4
-            AMPLITUD_Y = 4
-            VELOCIDAD = 0.003
-
-            t = self.tiempo * VELOCIDAD
-            off_x = int(math.sin(t) * AMPLITUD_X)
-            off_y = int(math.cos(t) * AMPLITUD_Y)
-
-            rival_x = RIVAL_X_BASE + off_x
-            rival_y = RIVAL_Y_BASE + off_y
-            self.dibujar_barra_hp(rival_x, rival_y,
-                                  juego.hp_enemigo, juego.hp_enemigo_max,
-                                  hp_img_chica, (220, 40, 40))
-
-            jugador_x = ANCHO - ancho_hp - JUGADOR_X_MARGEN_DER + off_x
-            jugador_y = JUGADOR_Y_BASE + off_y
-            self.dibujar_barra_hp(jugador_x, jugador_y,
-                                  juego.hp_jugador, juego.hp_jugador_max,
-                                  hp_img_chica, (0, 144, 248))
-        else:
-            hp_w = 70
-            hp_h = 8
-            self.dibujar_hp(3, 3, juego.hp_enemigo, juego.hp_enemigo_max,
-                            "RIVAL", (216, 40, 40), hp_w, hp_h)
-            self.dibujar_hp(ancho_m - hp_w - 3, 3,
-                            juego.hp_jugador, juego.hp_jugador_max,
-                            "TU", (0, 144, 248), hp_w, hp_h)
+        # Jugador: Pivote en el centro del emote, arco apuntando hacia arriba-izquierda (-135°)
+        jugador_cx = self.ui.get_width() - tam // 2 - MARGEN_X
+        jugador_cy = self.ui.get_height() - MARGEN_Y_BASE - tam // 2 + int(offset_flote)
+        self.dibujar_puntos_hp(
+            jugador_cx, jugador_cy,
+            juego.hp_jugador, juego.hp_jugador_max,
+            (0, 144, 248),          # Azul base
+            cantidad=6, radio=5, radio_arco=75,
+            angulo_centro=-135.0    # <-- Abarca de abajo-der a arriba-izq
+        )
 
         # --- Mana (abajo derecha) ---
         mana_disponible = getattr(juego, "mana_jugador", 0)
@@ -890,7 +861,13 @@ class Render:
                 carta = juego.mazo_jugador.cartas[idx_real]
                 cx, cy, angulo = posiciones_jugador[i]
 
-                if i == idx_hover:
+                es_hover = (i == idx_hover) or (foco_mano == i)
+                
+                if foco_mano == i and carta_hover is None:
+                    carta_hover = carta
+                    rect_hover = rect
+
+                if es_hover:
                     cy -= HOVER_LEVANTAR
                 cy += math.sin(self.tiempo * 0.002 + i * 0.9) * 1.5
 
@@ -899,28 +876,11 @@ class Render:
 
                 self._dibujar_carta_abanico(
                     cx, cy, carta, angulo,
-                    hover=(i == idx_hover),
+                    hover=es_hover,
                     seleccionada=es_seleccionada,
                     escala_base=escalas_mano[i],
                 )
-                if foco_mano == i:
-                    pygame.draw.rect(
-                        self.ui, (100, 255, 255),
-                        rect.inflate(-8, -8), 4,
-                    )
-        else:
-            for idx_real, rect in rects_jugador:
-                carta = juego.mazo_jugador.cartas[idx_real]
-                hover_j = rect.collidepoint(mouse) and juego.turno in (Turno.JUGADOR_TIRA, Turno.JUGADOR_HECHIZOS)
-                if hover_j:
-                    carta_hover = carta
-                    rect_hover = rect
-
-                x_m = rect.x // self.e
-                y_m = rect.y // self.e
-                self.dibujar_carta(x_m, y_m, carta, COLOR_JUGADOR,
-                                   hover=hover_j, ola=True)
-
+                
         # --- Zona de duelo ---
         cx_duelo = ancho_m // 2
         cy_duelo = Layout.Y_CENTRO_DUELO
@@ -1038,3 +998,14 @@ class Render:
             y_j = (self.ui.get_height() - tam - MARGEN_Y_BASE
                    + int(offset_flote) + mov_jug_y)
             self.ui.blit(emote_j, (x_j, y_j))
+
+        # ==================================================
+        # PANTALA DE GANADOR 
+        # ==================================================
+        if juego.hp_enemigo <= 0:
+            overlay = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180))
+            self.ui.blit(overlay, (0, 0))
+
+            self._texto_centrado_ui("¡VICTORIA!", self.f["grande"], AMARILLO, ANCHO // 2, ALTO // 2 - 40)
+            self._texto_centrado_ui("Has derrotado a tu rival", self.f["chica"], BLANCO, ANCHO // 2, ALTO // 2 + 10)
