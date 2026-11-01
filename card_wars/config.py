@@ -143,25 +143,31 @@ class Layout:
         return posiciones
 
     @classmethod
-    def distribucion_mano(cls, cartas, ancho_mundo, alto_mundo, reservar_hueco=False):
+    def distribucion_mano(cls, cartas, ancho_mundo, alto_mundo, reservar_hueco=None):
         cantidad = len(cartas)
         if cantidad == 0:
             return [], []
 
         escalas = [cls.escala_carta_mano(c) for c in cartas]
         
-        # Ancho base y espaciado (ajustá estos valores si querés que estén más juntas o separadas)
+        # Ancho base de la carta
         ancho_base = cls.CARTA_W
-        espaciado = cls.ABANICO_SEP_X_JUGADOR 
         
-        # Si hay una carta seleccionada (reservar_hueco), sumamos espacio extra para el "hueco"
-        ancho_extra_hueco = 20 if reservar_hueco else 0
+        # Margen de seguridad para que no toquen los bordes de la pantalla
+        margen_pantalla = 10 
         
-        # Calculamos el ancho total que ocupa la mano
-        ancho_total = sum(int(ancho_base * e) for e in escalas) + (espaciado * (cantidad - 1)) + ancho_extra_hueco
+        # Espaciado normal (pegadas, con un minimo de 2px)
+        espaciado = 2
         
-        # Empezamos a dibujar desde la izquierda para que no se muevan todas al centro
-        x_actual = (ancho_mundo - ancho_total) // 2
+        # Calculamos el ancho total sin el espacio extra
+        ancho_total = sum(int(ancho_base * e) for e in escalas) + (espaciado * (cantidad - 1))
+        
+        # Si entran todas, las centramos. Si no entran, las pegamos a los bordes.
+        if ancho_total > (ancho_mundo - margen_pantalla * 2):
+            x_actual = margen_pantalla
+        else:
+            x_actual = (ancho_mundo - ancho_total) // 2
+            
         y_base = alto_mundo - 2 - int(cls.CARTA_H * escalas[0] * 0.5)
 
         posiciones = []
@@ -173,9 +179,11 @@ class Layout:
             # Avanzamos para la siguiente carta
             x_actual += w_carta + espaciado
             
-            # Si la carta actual es la seleccionada, agregamos el espacio extra antes de la próxima
-            if reservar_hueco and i == reservar_hueco:
-                x_actual += ancho_extra_hueco
+            # --- MAGIA ACÁ ---
+            # Si esta carta es la que está en hover o ya fue bajada (reservar_hueco)
+            # le sumamos un espacio extra SOLO a partir de acá
+            if reservar_hueco is not None and i == reservar_hueco:
+                x_actual += 15  # Espacio extra para hacer el hueco
 
         return posiciones, escalas
 

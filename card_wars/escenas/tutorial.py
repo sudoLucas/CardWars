@@ -80,6 +80,10 @@ class EscenaTutorial(Escena):
         """Arranca la musica del tutorial al entrar."""
         self.app.cambiar_musica(RUTA_MUSICA_TUTORIAL)
 
+    def on_exit(self):
+        from escenas.menu import RUTA_MUSICA_MENU
+        self.app.cambiar_musica(RUTA_MUSICA_MENU)
+
     def _cargar(self, ruta):
         if os.path.isfile(ruta):
             try:

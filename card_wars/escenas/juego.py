@@ -11,7 +11,21 @@ from escenas.base import Escena
 from modelo.juego import Juego
 
 
-
+# ============================================================
+# MUSICA
+# ============================================================
+MUSICA_NIVELES = {
+    ("facil", "nivel1"): "facil1_1L.mp3",
+    ("facil", "nivel2"): "facil2_1SL.mp3",
+    ("facil", "nivel3"): "facil3_1SOL.mp3",
+    ("normal", "nivel1"): "normal1_2L.mp3",
+    ("normal", "nivel2"): "normal2_3SL.mp3",
+    ("normal", "nivel3"): "normal3_4L.mp3",
+    ("duro", "nivel1"): "duro1_4SL.mp3",
+    ("duro", "nivel2"): "duro2_5L.mp3",
+    ("duro", "nivel3"): "duro3_5OL.mp3",
+}
+CARPETA_SFX = os.path.join(DIRECTORIO_RAIZ, "assets", "sfx")
 CARPETA_EMOTES = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "emotes")
 RUTA_HP = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "HP.png")
 RUTA_MESA = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "panio.png")
@@ -91,6 +105,27 @@ class EscenaJuego(Escena):
         self.rects_cartas_rival_clickeables = []
         self.slots_rival_objetivo = []
 
+    # ---------- MUSICA ----------
+    def _ruta_musica_actual(self):
+        clave = (self.app.clave_dificultad, self.app.nivel_actual)
+        archivo = MUSICA_NIVELES.get(clave)
+        if not archivo:
+            return None
+        return os.path.join(CARPETA_SFX, archivo)
+
+    def on_enter(self):
+        ruta = self._ruta_musica_actual()
+        if ruta:
+            self.app.cambiar_musica(ruta)
+        else:
+            print(f"[juego] No hay musica para {self.app.clave_dificultad} / {self.app.nivel_actual}")
+
+    def on_exit(self):
+        from escenas.menu import RUTA_MUSICA_MENU
+        self.app.cambiar_musica(RUTA_MUSICA_MENU)
+
+    # ---------- INICIALIZACION INTERNA ----------
+
     def _elegir_personajes(self):
         self.personaje_jugador = random.choice(PERSONAJES)
         opciones_rival = [p for p in PERSONAJES if p != self.personaje_jugador]
@@ -107,7 +142,6 @@ class EscenaJuego(Escena):
         self.emote_rival_neutro = self._cargar(rutas_r["neutro"])
         self.emote_rival_feliz  = self._cargar(rutas_r["feliz"])
         self.emote_rival_triste = self._cargar(rutas_r["triste"])
-
     def _elegir_reversos(self):
         numeros = random.sample(range(1, 7), 3)
         self.reversos_img = []
@@ -158,7 +192,7 @@ class EscenaJuego(Escena):
     def _alto_mundo(self):
         return ALTO // ESCALA_PIXEL
 
-    def _calcular_posiciones_abanico(self, cartas, reservar_hueco=False):
+    def _calcular_posiciones_abanico(self, cartas, reservar_hueco=None):
         ancho_m = self._ancho_mundo()
         alto_m = self._alto_mundo()
         return Layout.distribucion_mano(
@@ -196,10 +230,17 @@ class EscenaJuego(Escena):
             for i, carta in enumerate(self.juego.mazo_jugador.cartas)
             if carta.viva and i != self.juego.carta_jugada_jugador
         ]
+
+        idx_hueco = None
+        if self.hechizo_seleccionado is not None:
+            idx_hueco = self.hechizo_seleccionado
+        elif self.foco_zona == "mano" and self.foco_teclado < len(vivas_j):
+            idx_hueco = vivas_j[self.foco_teclado][0]
+
         self.posiciones_jugador, self.escalas_jugador = (
             self._calcular_posiciones_abanico(
                 [carta for _, carta in vivas_j],
-                reservar_hueco=self.juego.carta_jugada_jugador is not None,
+                reservar_hueco=idx_hueco,  # <-- Ahora pasamos el índice
             )
         )
         self.rects_jugador = []
