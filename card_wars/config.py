@@ -15,6 +15,7 @@ SISTEMA DE VENTANA:
 """
 
 import os
+import unicodedata
 from dataclasses import dataclass
 import pygame
 
@@ -31,6 +32,11 @@ AUTOR   = ""
 # RUTAS (absolutas, relativas a este archivo)
 # ============================================================
 DIRECTORIO_RAIZ = os.path.dirname(os.path.abspath(__file__))
+CARPETA_FONDOS = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes")
+FONDO_GANAR = os.path.join(CARPETA_FONDOS, "winner.png")
+FONDO_PERDER = os.path.join(CARPETA_FONDOS, "loser.png")
+TAZA_GANAR = os.path.join(CARPETA_FONDOS, "coolguy.png")
+TAZA_PERDER = os.path.join(CARPETA_FONDOS, "dweeb.png")
 
 
 # ============================================================
@@ -136,7 +142,7 @@ class Layout:
 
     @classmethod
     def posiciones_mano(cls, cartas, ancho_mundo, alto_mundo,
-                        reservar_hueco=False):
+                        reservar_hueco=None):
         posiciones, _ = cls.distribucion_mano(
             cartas, ancho_mundo, alto_mundo, reservar_hueco,
         )
@@ -149,20 +155,21 @@ class Layout:
             return [], []
 
         escalas = [cls.escala_carta_mano(c) for c in cartas]
-        
-        # Ancho base de la carta
         ancho_base = cls.CARTA_W
-        
-        # Margen de seguridad para que no toquen los bordes de la pantalla
         margen_pantalla = 10 
         
-        # Espaciado normal (pegadas, con un minimo de 2px)
-        espaciado = 2
+        # 1. Calculamos el ancho de cada carta y el espaciado normal
+        espaciado = 4
+        ancho_cartas = [int(ancho_base * e) for e in escalas]
         
-        # Calculamos el ancho total sin el espacio extra
-        ancho_total = sum(int(ancho_base * e) for e in escalas) + (espaciado * (cantidad - 1))
+        # 2. Si hay carta jugada, reservamos un espacio extra fijo (ej. 50 px)
+        # El índice del hueco será justo en el medio de las cartas que quedan en mano
+        hueco_extra = 50 if (reservar_hueco is not None and isinstance(reservar_hueco, int)) else 0
         
-        # Si entran todas, las centramos. Si no entran, las pegamos a los bordes.
+        # Calculamos el ancho total base
+        ancho_total = sum(ancho_cartas) + (espaciado * (cantidad - 1)) + hueco_extra
+        
+        # 3. Punto de inicio para que quede centrado en pantalla
         if ancho_total > (ancho_mundo - margen_pantalla * 2):
             x_actual = margen_pantalla
         else:
@@ -171,19 +178,19 @@ class Layout:
         y_base = alto_mundo - 2 - int(cls.CARTA_H * escalas[0] * 0.5)
 
         posiciones = []
+        # El punto exacto donde metemos el hueco (en la mitad de la lista)
+        idx_hueco = cantidad // 2 
+
         for i in range(cantidad):
-            w_carta = int(ancho_base * escalas[i])
-            cx = x_actual + w_carta // 2
+            # 4. Si estamos en el índice del hueco, avanzamos el "pincel" antes de dibujar
+            if hueco_extra > 0 and i == idx_hueco:
+                x_actual += hueco_extra
+
+            cx = x_actual + ancho_cartas[i] // 2
             posiciones.append((cx, y_base, 0))
             
             # Avanzamos para la siguiente carta
-            x_actual += w_carta + espaciado
-            
-            # --- MAGIA ACÁ ---
-            # Si esta carta es la que está en hover o ya fue bajada (reservar_hueco)
-            # le sumamos un espacio extra SOLO a partir de acá
-            if reservar_hueco is not None and i == reservar_hueco:
-                x_actual += 15  # Espacio extra para hacer el hueco
+            x_actual += ancho_cartas[i] + espaciado
 
         return posiciones, escalas
 
@@ -466,30 +473,73 @@ POOL_CARTAS = [
 # MAPEO DE IMAGENES DE CARTAS
 # ============================================================
 IMAGENES_CARTAS = {
-    "Dragon": "Dragon.png",
-    "Fenix": "Fenix.png",
-    "Gato": "Gato.png",
-    "Golem": "Golem.png",
-    "Lobo": "Lobo.png",
-    "Vampiro": "Mr.Vampire.png", 
-    "Perro": "Perro.png",
-    "Slime": "Slime.png",
-    "Tigre": "Tigre.png",
-    "Titan": "Titan.png",
-    "Pocion de fuerza": "Pocion.png",
-    "Pocion de defensa": "Pocion.png",
-    "Curacion": "Pocion.png",     
-    "Vision": "Pocion.png",       
-    "Robo": "Pocion.png",         
-    "Rayo": "Pocion.png",         
-    "Debilidad": "Pocion.png",    
-    "Drenaje": "Pocion.png",      
-    "Inmovilizar": "Pocion.png",  
+    # Criaturas
+    "Dragon":  "Dragon.png",
+    "Fenix":   "Fenix.png",
+    "Gato":    "Gato.png",
+    "Golem":   "Golem.png",
+    "Lobo":    "Lobo.png",
+    "Vampiro": "Mr.Vampire.png",
+    "Perro":   "Perro.png",
+    "Slime":   "Slime.png",
+    "Tigre":   "Tigre.png",
+    "Titan":   "Titan.png",
 }
-CARPETA_CARTAS = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "objetos", "cartas")
+
+# Imagenes por id de hechizo (mas confiable que por nombre)
+IMAGENES_HECHIZOS = {
+    "vision":      "Pocion.png",
+    "fuerza":      "Pocion.png",
+    "defensa":     "Pocion.png",
+    "curacion":    "Pocion.png",
+    "rayo":        "Pocion.png",
+    "debilidad":   "Pocion.png",
+    "robo":        "Pocion.png",
+    "drenaje":     "Pocion.png",
+    "inmovilizar": "Pocion.png",
+}
+
+CARPETA_CARTAS = os.path.join(
+    DIRECTORIO_RAIZ, "assets", "imagenes", "objetos", "cartas"
+)
 
 # ============================================================
 # HELPERS
 # ============================================================
 def get_dificultad(clave):
     return DIFICULTADES.get(clave, DIFICULTADES[DIFICULTAD_DEFAULT])
+
+def _normalizar_nombre(nombre):
+    """Minusculas, sin tildes, espacios colapsados."""
+    if nombre is None:
+        return ""
+    n = unicodedata.normalize("NFKD", str(nombre))
+    n = "".join(c for c in n if not unicodedata.combining(c))
+    return " ".join(n.lower().split())
+
+# Indice normalizado de criaturas (se arma una sola vez)
+_INDICE_IMAGENES_NORM = {
+    _normalizar_nombre(k): v for k, v in IMAGENES_CARTAS.items()
+}
+
+def obtener_imagen_carta(carta):
+    """
+    Devuelve el nombre de archivo de imagen para una carta, o None.
+    Prioriza el id de hechizo; si no, busca por nombre normalizado.
+    """
+    # 1) Hechizos: por id (lo mas confiable)
+    hechizo_id = getattr(carta, "hechizo_id", None)
+    if hechizo_id and hechizo_id in IMAGENES_HECHIZOS:
+        return IMAGENES_HECHIZOS[hechizo_id]
+
+    # 2) Por nombre normalizado (criaturas y fallback)
+    clave = _normalizar_nombre(getattr(carta, "nombre", None))
+    if clave in _INDICE_IMAGENES_NORM:
+        return _INDICE_IMAGENES_NORM[clave]
+
+    # 3) Ultimo fallback: si es hechizo pero no tiene id reconocido,
+    #    usar la imagen generica de pocion si existe en el dict
+    if getattr(carta, "tipo", "criatura") == "hechizo":
+        return IMAGENES_HECHIZOS.get("vision")  # o "Pocion.png" directo
+
+    return None

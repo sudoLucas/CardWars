@@ -3,7 +3,10 @@ import os
 import math
 import pygame
 
-from config import ANCHO, ALTO, Layout, Botones, Turno, ESCALA_PIXEL, HECHIZOS
+from config import (
+    ANCHO, ALTO, Layout, Botones, Turno, ESCALA_PIXEL, HECHIZOS,
+    FONDO_GANAR, FONDO_PERDER, TAZA_GANAR, TAZA_PERDER
+)
 from vista.colores import (
     NEGRO, BLANCO, AMARILLO, ROJO, GRIS_OSCURO,
     COLOR_JUGADOR, COLOR_JUGADOR_HOVER, COLOR_ENEMIGO,
@@ -199,11 +202,13 @@ class Render:
     # CARTA DEL JUGADOR EN EL ABANICO
     # ==================================================
     def _obtener_imagen_carta(self, carta):
-        from config import IMAGENES_CARTAS, CARPETA_CARTAS
-        
-        # Buscamos el nombre del archivo en el diccionario
-        nombre_archivo = IMAGENES_CARTAS.get(carta.nombre)
+        from config import obtener_imagen_carta, CARPETA_CARTAS
+
+        nombre_archivo = obtener_imagen_carta(carta)
         if not nombre_archivo:
+            print(f"[render] SIN MAPEO para carta.nombre={carta.nombre!r} "
+                f"tipo={getattr(carta, 'tipo', None)!r} "
+                f"hechizo_id={getattr(carta, 'hechizo_id', None)!r}")
             return None
 
         if nombre_archivo in self.cache_imagenes_cartas:
@@ -212,7 +217,6 @@ class Render:
         ruta = os.path.join(CARPETA_CARTAS, nombre_archivo)
         if os.path.isfile(ruta):
             try:
-                # Cargamos la imagen y la achicamos a 210x260 (el tamaño original)
                 img = pygame.image.load(ruta).convert_alpha()
                 img = pygame.transform.smoothscale(img, (210, 260))
                 self.cache_imagenes_cartas[nombre_archivo] = img
@@ -222,7 +226,6 @@ class Render:
         else:
             print(f"[render] Imagen NO ENCONTRADA: {ruta}")
 
-        # Si no se pudo cargar, guardamos None para no intentar de nuevo cada frame
         self.cache_imagenes_cartas[nombre_archivo] = None
         return None
 
@@ -726,6 +729,44 @@ class Render:
                                    x_m + w_m // 2, y_m + h_m // 2 - 4)
         return rect
 
+    def dibujar_fondo_animado(self, screen, fondo_img, taza_img, es_ganador, tiempo):
+        # 1. Dibujar el fondo con efecto de ola
+        # Para simular la ola, dibujamos la imagen en franjas horizontales
+        # con un pequeño desplazamiento vertical.
+        
+        w, h = screen.get_size()
+        fondo_escalado = pygame.transform.smoothscale(fondo_img, (w, h))
+        
+        # Efecto de ola: dividimos la pantalla en franjas y las movemos
+        franjas = 20
+        alto_franja = h // franjas
+        
+        for i in range(franjas):
+            # Offset vertical basado en el tiempo y la posición
+            offset_y = math.sin(tiempo * 0.002 + i * 0.5) * 10
+            
+            # Recortamos la franja de la imagen original
+            rect_franja = pygame.Rect(0, i * alto_franja, w, alto_franja)
+            if i == franjas - 1:  # La última franja es más alta
+                rect_franja.height = h - (i * alto_franja)
+            
+            # Dibujamos la franja desplazada
+            screen.blit(fondo_escalado, 
+                        (0, i * alto_franja + offset_y), 
+                        rect_franja)
+            
+        # 2. Dibujar la taza (coolguy o dweeb) en el centro
+        if taza_img:
+            # Escalar la taza al 50% del tamaño de la pantalla
+            tam_taza = int(h * 0.5)
+            taza_escalada = pygame.transform.smoothscale(taza_img, (tam_taza, tam_taza))
+            
+            # Animación de flotación para la taza
+            offset_flote = math.sin(tiempo * 0.005) * 15
+            rect_taza = taza_escalada.get_rect(center=(w // 2, h // 2 + offset_flote))
+            
+            screen.blit(taza_escalada, rect_taza)
+
     # ==================================================
     # ESCENA COMPLETA
     # ==================================================
@@ -867,26 +908,30 @@ class Render:
                                 rect_rival.inflate(-8, -8), 4,
                             )
 
-        # --- Mano del jugador ---
+            # --- Mano del jugador ---
         carta_hover = None
         rect_hover = None
 
         if posiciones_jugador is not None and len(posiciones_jugador) > 0 and len(posiciones_jugador) == len(rects_jugador):
             cantidad = len(rects_jugador)
-            escalas_mano = escalas_jugador
-            if escalas_mano is None:
-                cartas_mano = [
-                    juego.mazo_jugador.cartas[idx_real]
-                    for idx_real, _ in rects_jugador
-                ]
-                _, escalas_mano = Layout.distribucion_mano(
-                    cartas_mano, ancho_m, alto_m,
-                    reservar_hueco=juego.carta_jugada_jugador is not None,
-                )
+            
+            # 1. Armamos la lista con TODAS las cartas (necesitamos el índice real para el hueco)
+            cartas_mano = [
+                juego.mazo_jugador.cartas[idx_real]
+                for idx_real, _ in rects_jugador
+            ]
+            
+            # 2. Calculamos las posiciones. 
+            # Si hay una carta jugada, le pasamos su índice para que haga el hueco.
+            idx_jugada = juego.carta_jugada_jugador
+            posiciones_mano, escalas_mano = Layout.distribucion_mano(
+                cartas_mano, ancho_m, alto_m, 
+                reservar_hueco=idx_jugada
+            )
 
-            orden = list(range(cantidad))
+            # 3. Detección de hover
             idx_hover = -1
-            for i in reversed(orden):
+            for i in range(cantidad):
                 idx_real, rect = rects_jugador[i]
                 if rect.collidepoint(mouse) and juego.turno in (Turno.JUGADOR_TIRA, Turno.JUGADOR_HECHIZOS):
                     idx_hover = i
@@ -894,10 +939,16 @@ class Render:
                     rect_hover = rect
                     break
 
-            for i in orden:
+            # 4. Dibujamos
+            for i in range(cantidad):
                 idx_real, rect = rects_jugador[i]
+                
+                # Si esta carta es la que está en la mesa, no la dibujamos en el abanico
+                if juego.carta_jugada_jugador is not None and idx_real == juego.carta_jugada_jugador:
+                    continue
+                
                 carta = juego.mazo_jugador.cartas[idx_real]
-                cx, cy, angulo = posiciones_jugador[i]
+                cx, cy, angulo = posiciones_mano[i]
 
                 es_hover = (i == idx_hover) or (foco_mano == i)
                 
@@ -1034,12 +1085,48 @@ class Render:
             self.ui.blit(emote_j, (x_j, y_j))
 
         # ==================================================
-        # PANTALA DE GANADOR 
+        # PANTALA DE GANADOR / PERDEDOR
         # ==================================================
-        if juego.hp_enemigo <= 0:
-            overlay = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 180))
-            self.ui.blit(overlay, (0, 0))
+        if juego.hp_enemigo <= 0 or juego.hp_jugador <= 0:
+            # 1. Determinar si ganaste o perdiste
+            es_ganador = (juego.hp_enemigo <= 0)
+            print = ("ENTRÓ A LA PANTALLA DE VICTORIA!")
+            if not hasattr(self, '_fondo_win'):
+                try:
+                    self._fondo_win = pygame.image.load(FONDO_GANAR).convert_alpha()
+                    self._fondo_lose = pygame.image.load(FONDO_PERDER).convert_alpha()
+                    self._taza_win = pygame.image.load(TAZA_GANAR).convert_alpha()
+                    self._taza_lose = pygame.image.load(TAZA_PERDER).convert_alpha()
+                except Exception as e:
+                    print(f"[render] Error cargando fondos de victoria/derrota: {e}")
+                    self._fondo_win = None
+                    self._fondo_lose = None
+                    self._taza_win = None
+                    self._taza_lose = None
 
-            self._texto_centrado_ui("¡VICTORIA!", self.f["grande"], AMARILLO, ANCHO // 2, ALTO // 2 - 40)
-            self._texto_centrado_ui("Has derrotado a tu rival", self.f["chica"], BLANCO, ANCHO // 2, ALTO // 2 + 10)
+            # 3. Elegir cuál usar
+            if es_ganador:
+                fondo_actual = self._fondo_win
+                taza_actual = self._taza_win
+            else:
+                fondo_actual = self._fondo_lose
+                taza_actual = self._taza_lose
+
+            # 4. Dibujar el fondo animado
+            if self._fondo_win and self._fondo_lose:
+                if es_ganador:
+                    fondo_actual = self._fondo_win
+                    taza_actual = self._taza_win
+                else:
+                    fondo_actual = self._fondo_lose
+                    taza_actual = self._taza_lose
+
+                self.dibujar_fondo_animado(self.ui, fondo_actual, taza_actual, es_ganador, self.tiempo)
+
+            # 5. Dibujar los textos por encima
+            self._texto_centrado_ui("¡VICTORIA!" if es_ganador else "DERROTA", 
+                                    self.f["grande"], AMARILLO if es_ganador else ROJO, 
+                                    ANCHO // 2, ALTO // 2 - 40)
+            self._texto_centrado_ui("Has derrotado a tu rival" if es_ganador else "Has sido derrotado", 
+                                    self.f["chica"], BLANCO, 
+                                    ANCHO // 2, ALTO // 2 + 10)
