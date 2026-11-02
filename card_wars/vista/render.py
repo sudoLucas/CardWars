@@ -308,25 +308,22 @@ class Render:
         centro_x = ox + w_draw // 2
         
 
-        def texto_ajustado(texto, color, centro_x, y, ancho_max):
-            texto_surf = self.f["mini"].render(texto, False, color)
-            ancho = min(max(1, texto_surf.get_width() // 2), ancho_max)
-            alto = max(1, texto_surf.get_height() // 2)
-            if ancho < texto_surf.get_width() // 2:
-                alto = max(
-                    1,
-                    int(alto * ancho / max(1, texto_surf.get_width() // 2)),
-                )
-            texto_surf = pygame.transform.scale(texto_surf, (ancho, alto))
-
-            # Contorno oscuro para que resalte sobre cualquier fondo
-            contorno = self.f["mini"].render(texto, False, NEGRO)
-            contorno = pygame.transform.scale(contorno, (ancho, alto))
-            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                surf.blit(contorno, (centro_x - ancho // 2 + dx, y + dy))
-
-            surf.blit(texto_surf, (centro_x - ancho // 2, y))
-
+        if es_hechizo:
+            texto_ajustado(
+                f"{carta.costo_mana} MANA", (0, 200, 255), centro_x,
+                oy + h_draw - 12, w_draw - 6,
+            )
+        else:
+            poder_txt = str(carta.poder) if carta.viva else "0"
+            texto_ajustado(
+                poder_txt, (0, 255, 140) if carta.viva else GRIS_OSCURO,
+                centro_x, oy + h_draw // 2 - 8, w_draw - 6,
+            )
+            texto_ajustado(
+                "PODER", (0, 255, 140), centro_x, oy + h_draw // 2 + 1,
+                w_draw - 6,
+            )
+            
             if carta.viva:
                 max_ag = getattr(carta, "poder_original", carta.poder)
                 ancho_barra = w_draw - 8
