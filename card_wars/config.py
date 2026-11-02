@@ -37,6 +37,9 @@ FONDO_GANAR = os.path.join(CARPETA_FONDOS, "winner.png")
 FONDO_PERDER = os.path.join(CARPETA_FONDOS, "loser.png")
 TAZA_GANAR = os.path.join(CARPETA_FONDOS, "coolguy.png")
 TAZA_PERDER = os.path.join(CARPETA_FONDOS, "dweeb.png")
+CARPETA_VIDEOS = os.path.join(DIRECTORIO_RAIZ, "assets", "videos")
+# Crear la carpeta automáticamente si no existe
+os.makedirs(CARPETA_VIDEOS, exist_ok=True)
 
 
 # ============================================================

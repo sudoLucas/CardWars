@@ -60,8 +60,8 @@ class EscenaMenu(Escena):
         margen_x = Botones.MENU_X_MARGEN * ESCALA_PIXEL
         margen_y = Botones.MENU_Y_MARGEN * ESCALA_PIXEL
 
-        claves = ["jugar", "dificultad", "salir"]
-        textos = ["JUGAR", "DIFICULTAD", "SALIR"]
+        claves = ["jugar", "pvp", "dificultad", "salir"]
+        textos = ["JUGAR", "PVP", "DIFICULTAD", "SALIR"]
         n = len(claves)
 
         y_ultimo = ALTO - margen_y - h
@@ -134,6 +134,9 @@ class EscenaMenu(Escena):
         if clave == "jugar":
             from escenas.niveles import EscenaNiveles
             self.app.cambiar_escena(EscenaNiveles(self.app))
+        elif clave == "pvp":
+            from escenas.conexion import EscenaConexion
+            self.app.cambiar_escena(EscenaConexion(self.app))
         elif clave == "dificultad":
             self.app.cambiar_escena(EscenaDificultad(self.app))
         elif clave == "salir":

@@ -72,6 +72,12 @@ class App:
         self.escena = nueva_escena
         self.escena.on_enter()
 
+    # --- AGREGADO PARA EL PVP / RICKROLL ---
+    def iniciar_video_rickroll(self):
+        from escenas.video_rickroll import EscenaVideoRickroll
+        self.cambiar_escena(EscenaVideoRickroll(self))
+    # ---------------------------------------
+
     def _pos_interna(self, pos):
         mx, my = pos
         return (
