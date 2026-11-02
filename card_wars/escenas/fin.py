@@ -1,6 +1,10 @@
 # escenas/fin.py
 import pygame
-from config import ANCHO, ALTO, Botones
+import os
+from config import (
+    ANCHO, ALTO, Botones, 
+    FONDO_GANAR, FONDO_PERDER, TAZA_GANAR, TAZA_PERDER
+)
 from escenas.base import Escena
 from vista.colores import (
     NEGRO, BLANCO, AMARILLO, VERDE, ROJO, GRIS,
@@ -34,6 +38,19 @@ class EscenaFin(Escena):
         ]
         self.hover = None
 
+        # --- Cargar imágenes de fondo y tazas ---
+        self.fondo_img = None
+        self.taza_img = None
+        try:
+            if self.gano:
+                self.fondo_img = pygame.image.load(FONDO_GANAR).convert_alpha()
+                self.taza_img = pygame.image.load(TAZA_GANAR).convert_alpha()
+            else:
+                self.fondo_img = pygame.image.load(FONDO_PERDER).convert_alpha()
+                self.taza_img = pygame.image.load(TAZA_PERDER).convert_alpha()
+        except Exception as e:
+            print(f"[fin] Error cargando imágenes: {e}")
+
     def handle_event(self, evento, mouse):
         self.hover = None
         for clave, _, rect in self.botones:
@@ -59,6 +76,17 @@ class EscenaFin(Escena):
     def draw(self):
         self.pantalla.fill(NEGRO)
 
+        # 1. Dibujar el fondo animado (llamando a la función del Render)
+        if self.fondo_img is not None:
+            self.render.dibujar_fondo_animado(
+                self.render.ui, 
+                self.fondo_img, 
+                self.taza_img, 
+                self.gano, 
+                self.app.tiempo_fondo
+            )
+
+        # 2. Dibujar textos y botones por encima
         color = VERDE if self.gano else ROJO
         texto = "GANASTE" if self.gano else "PERDISTE"
         self.render._texto_centrado_ui(texto, self.fuentes["grande"], color,
