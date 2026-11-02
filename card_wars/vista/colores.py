@@ -38,3 +38,6 @@ COLOR_BTN_AZUL_OFF   = (0, 88, 168)
 # Borde de los botones (contenedor)
 COLOR_BORDE_BOTON        = (255, 220, 60)    # amarillo dorado (normal)
 COLOR_BORDE_BOTON_HOVER  = (255, 255, 180)   # amarillo claro (hover)
+
+COLOR_TEXTO_CARTA = (184, 134, 11), 
+COLOR_TEXTO_MANA = (218, 165, 32)

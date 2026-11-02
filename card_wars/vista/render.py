@@ -1,4 +1,5 @@
 # card_wars/vista/render.py
+import os
 import math
 import pygame
 
@@ -11,8 +12,8 @@ from vista.colores import (
     COLOR_BTN_VERDE, COLOR_BTN_VERDE_OFF,
     COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF,
     COLOR_BORDE_BOTON, COLOR_BORDE_BOTON_HOVER,
+    COLOR_TEXTO_CARTA, COLOR_TEXTO_MANA,
 )
-
 OLA_AMPLITUD   = 5.0
 OLA_FRECUENCIA = 0.15
 OLA_VELOCIDAD  = 0.006
@@ -31,6 +32,7 @@ HOVER_ESCALA = 1.0
 
 class Render:
     def __init__(self, surface_mundo, surface_ui, fuentes):
+        self.cache_imagenes_cartas = {}
         self.mundo = surface_mundo
         self.ui = surface_ui
         self.f = fuentes
@@ -196,6 +198,34 @@ class Render:
     # ==================================================
     # CARTA DEL JUGADOR EN EL ABANICO
     # ==================================================
+    def _obtener_imagen_carta(self, carta):
+        from config import IMAGENES_CARTAS, CARPETA_CARTAS
+        
+        # Buscamos el nombre del archivo en el diccionario
+        nombre_archivo = IMAGENES_CARTAS.get(carta.nombre)
+        if not nombre_archivo:
+            return None
+
+        if nombre_archivo in self.cache_imagenes_cartas:
+            return self.cache_imagenes_cartas[nombre_archivo]
+
+        ruta = os.path.join(CARPETA_CARTAS, nombre_archivo)
+        if os.path.isfile(ruta):
+            try:
+                # Cargamos la imagen y la achicamos a 210x260 (el tamaño original)
+                img = pygame.image.load(ruta).convert_alpha()
+                img = pygame.transform.smoothscale(img, (210, 260))
+                self.cache_imagenes_cartas[nombre_archivo] = img
+                return img
+            except Exception as e:
+                print(f"[render] Error al cargar imagen {ruta}: {e}")
+        else:
+            print(f"[render] Imagen NO ENCONTRADA: {ruta}")
+
+        # Si no se pudo cargar, guardamos None para no intentar de nuevo cada frame
+        self.cache_imagenes_cartas[nombre_archivo] = None
+        return None
+
     def _dibujar_carta_abanico(self, cx_m, cy_m, carta, angulo, hover=False,
                                seleccionada=False, escala_base=None):
         w, h = Layout.CARTA_W, Layout.CARTA_H
@@ -226,8 +256,16 @@ class Render:
             color = COLOR_JUGADOR
 
         rect = pygame.Rect(ox, oy, w_draw, h_draw)
+        
         pygame.draw.rect(surf, color, rect)
+        
+        imagen_carta = self._obtener_imagen_carta(carta)
+        if imagen_carta is not None:
 
+            img_escalada = pygame.transform.smoothscale(imagen_carta, (w_draw, h_draw))
+
+            surf.blit(img_escalada, (ox, oy))
+            
         if es_hechizo:
             pygame.draw.rect(surf, COLOR_HECHIZO_BRILLO, rect, 2)
         else:
@@ -268,43 +306,26 @@ class Render:
             surf.blit(texto_surf, (centro_x - ancho // 2, y))
 
         centro_x = ox + w_draw // 2
-        pygame.draw.rect(
-            surf,
-            (min(255, color[0] + 18), min(255, color[1] + 18),
-             min(255, color[2] + 18)),
-            (ox + 2, oy + 2, w_draw - 4, max(7, h_draw // 5)),
-        )
-        pygame.draw.line(
-            surf, (min(255, color[0] + 55), min(255, color[1] + 55),
-                   min(255, color[2] + 55)),
-            (ox + 2, oy + h_draw - 2), (ox + w_draw - 3, oy + h_draw - 2), 1,
-        )
-        texto_ajustado(
-            carta.nombre[:14], BLANCO, centro_x, oy + 3, w_draw - 6,
-        )
+        
 
-        if es_hechizo:
-            pygame.draw.polygon(
-                surf, COLOR_HECHIZO_BRILLO,
-                [(centro_x, oy + h_draw // 2 - 7),
-                 (centro_x + 6, oy + h_draw // 2),
-                 (centro_x, oy + h_draw // 2 + 7),
-                 (centro_x - 6, oy + h_draw // 2)],
-            )
-            texto_ajustado(
-                f"{carta.costo_mana} MANA", AMARILLO, centro_x,
-                oy + h_draw - 12, w_draw - 6,
-            )
-        else:
-            poder_txt = str(carta.poder) if carta.viva else "0"
-            texto_ajustado(
-                poder_txt, AMARILLO if carta.viva else GRIS_OSCURO,
-                centro_x, oy + h_draw // 2 - 8, w_draw - 6,
-            )
-            texto_ajustado(
-                "PODER", BLANCO, centro_x, oy + h_draw // 2 + 1,
-                w_draw - 6,
-            )
+        def texto_ajustado(texto, color, centro_x, y, ancho_max):
+            texto_surf = self.f["mini"].render(texto, False, color)
+            ancho = min(max(1, texto_surf.get_width() // 2), ancho_max)
+            alto = max(1, texto_surf.get_height() // 2)
+            if ancho < texto_surf.get_width() // 2:
+                alto = max(
+                    1,
+                    int(alto * ancho / max(1, texto_surf.get_width() // 2)),
+                )
+            texto_surf = pygame.transform.scale(texto_surf, (ancho, alto))
+
+            # Contorno oscuro para que resalte sobre cualquier fondo
+            contorno = self.f["mini"].render(texto, False, NEGRO)
+            contorno = pygame.transform.scale(contorno, (ancho, alto))
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                surf.blit(contorno, (centro_x - ancho // 2 + dx, y + dy))
+
+            surf.blit(texto_surf, (centro_x - ancho // 2, y))
 
             if carta.viva:
                 max_ag = getattr(carta, "poder_original", carta.poder)
@@ -391,7 +412,18 @@ class Render:
 
         offset_skew = int(inclinacion)
         rect_m = pygame.Rect(x_i + offset_skew, y_i, w_3d, h_3d)
+        
+        # Fondo de color base
         pygame.draw.rect(self.mundo, color, rect_m)
+        
+        # Intentamos cargar la imagen
+        imagen_carta = self._obtener_imagen_carta(carta)
+        if imagen_carta is not None:
+            # Escalamos al tamaño actual de la carta en la mesa
+            img_escalada = pygame.transform.smoothscale(imagen_carta, (w_3d, h_3d))
+            
+            # Para que el relieve 3D se vea bien, la pegamos ligeramente desplazada
+            self.mundo.blit(img_escalada, (x_i + offset_skew, y_i))
 
         if destacada:
             pygame.draw.rect(self.mundo, AMARILLO, rect_m, 2)
@@ -494,11 +526,20 @@ class Render:
             return lineas
 
         lineas_titulo = envolver(titulo)
-        lineas_detalle = (
-            envolver(data.get("descripcion", ""))[:3]
-            if es_hechizo else
-            [f"{carta.poder} dano", f"{carta.aguante} vida"]
-        )
+
+        # --- DETALLE: maná para hechizos, dano/vida para criaturas ---
+        if es_hechizo:
+            desc = data.get("descripcion", "")
+            costo = data.get("costo", 0)
+            texto_costo = f"Costo: {costo} maná"
+            texto_completo = f"{desc} | {texto_costo}"
+            lineas_detalle = envolver(texto_completo)[:3]
+        else:
+            lineas_detalle = [
+                f"{carta.poder} dano",
+                f"{carta.aguante} vida",
+            ]
+
         alto = 16 + 22 * (len(lineas_titulo) + len(lineas_detalle))
         rect = pygame.Rect(
             max(4, min(x, self.ui.get_width() - ancho - 4)),
@@ -924,10 +965,6 @@ class Render:
             )
 
         # --- Botones ---
-        if btn_reiniciar is not None:
-            hover_re = btn_reiniciar.collidepoint(mouse)
-            self.dibujar_boton(btn_reiniciar, "REINICIAR", hover_re,
-                               COLOR_BTN_AZUL, COLOR_BTN_AZUL_OFF)
 
         if btn_siguiente is not None and juego.turno == Turno.RESULTADO:
             hover_sig = btn_siguiente.collidepoint(mouse)

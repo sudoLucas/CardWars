@@ -462,6 +462,31 @@ POOL_CARTAS = [
     ("Vampiro", 25),
 ]
 
+# ============================================================
+# MAPEO DE IMAGENES DE CARTAS
+# ============================================================
+IMAGENES_CARTAS = {
+    "Dragon": "Dragon.png",
+    "Fenix": "Fenix.png",
+    "Gato": "Gato.png",
+    "Golem": "Golem.png",
+    "Lobo": "Lobo.png",
+    "Vampiro": "Mr.Vampire.png", 
+    "Perro": "Perro.png",
+    "Slime": "Slime.png",
+    "Tigre": "Tigre.png",
+    "Titan": "Titan.png",
+    "Pocion de fuerza": "Pocion.png",
+    "Pocion de defensa": "Pocion.png",
+    "Curacion": "Pocion.png",     
+    "Vision": "Pocion.png",       
+    "Robo": "Pocion.png",         
+    "Rayo": "Pocion.png",         
+    "Debilidad": "Pocion.png",    
+    "Drenaje": "Pocion.png",      
+    "Inmovilizar": "Pocion.png",  
+}
+CARPETA_CARTAS = os.path.join(DIRECTORIO_RAIZ, "assets", "imagenes", "objetos", "cartas")
 
 # ============================================================
 # HELPERS
