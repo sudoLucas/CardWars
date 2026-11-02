@@ -49,4 +49,3 @@ class Progreso:
             self.datos[dificultad] = ["nivel1"]
         if nivel not in self.datos[dificultad]:
             self.datos[dificultad].append(nivel)
-            self.guardar()
