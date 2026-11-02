@@ -108,3 +108,6 @@ class EscenaFin(Escena):
         self.render._texto_centrado_ui("ESC para volver al menu",
                                         self.fuentes["chica"], GRIS,
                                         ANCHO // 2, ALTO - 30)
+    def update(self, dt):
+        # Incrementamos el tiempo global para que el fondo se mueva
+        self.app.tiempo_fondo += dt
