@@ -1085,26 +1085,30 @@ class Render:
             self.ui.blit(emote_j, (x_j, y_j))
 
         # ==================================================
-        # PANTALA DE GANADOR / PERDEDOR
+        # PANTALLA DE GANADOR / PERDEDOR
         # ==================================================
         if juego.hp_enemigo <= 0 or juego.hp_jugador <= 0:
-            # 1. Determinar si ganaste o perdiste
             es_ganador = (juego.hp_enemigo <= 0)
-            print = ("ENTRÓ A LA PANTALLA DE VICTORIA!")
+            
+            # 1. Cargar imágenes una sola vez
             if not hasattr(self, '_fondo_win'):
                 try:
+                    print(f"[render] Cargando fondo: {FONDO_GANAR}")
                     self._fondo_win = pygame.image.load(FONDO_GANAR).convert_alpha()
                     self._fondo_lose = pygame.image.load(FONDO_PERDER).convert_alpha()
+                    
+                    print(f"[render] Cargando taza: {TAZA_GANAR}")
                     self._taza_win = pygame.image.load(TAZA_GANAR).convert_alpha()
                     self._taza_lose = pygame.image.load(TAZA_PERDER).convert_alpha()
+                    print("[render] Imágenes de victoria/derrota cargadas con éxito.")
                 except Exception as e:
-                    print(f"[render] Error cargando fondos de victoria/derrota: {e}")
+                    print(f"[render] ERROR CRÍTICO cargando imágenes: {e}")
                     self._fondo_win = None
                     self._fondo_lose = None
                     self._taza_win = None
                     self._taza_lose = None
 
-            # 3. Elegir cuál usar
+            # 2. Elegir cuál usar
             if es_ganador:
                 fondo_actual = self._fondo_win
                 taza_actual = self._taza_win
@@ -1112,18 +1116,14 @@ class Render:
                 fondo_actual = self._fondo_lose
                 taza_actual = self._taza_lose
 
-            # 4. Dibujar el fondo animado
-            if self._fondo_win and self._fondo_lose:
-                if es_ganador:
-                    fondo_actual = self._fondo_win
-                    taza_actual = self._taza_win
-                else:
-                    fondo_actual = self._fondo_lose
-                    taza_actual = self._taza_lose
-
+            # 3. Dibujar el fondo animado (Solo si cargó bien)
+            if fondo_actual is not None:
                 self.dibujar_fondo_animado(self.ui, fondo_actual, taza_actual, es_ganador, self.tiempo)
+            else:
+                # Si falló la carga, pintamos un fondo negro para que se lea el texto
+                self.ui.fill((0, 0, 0))
 
-            # 5. Dibujar los textos por encima
+            # 4. Dibujar los textos por encima
             self._texto_centrado_ui("¡VICTORIA!" if es_ganador else "DERROTA", 
                                     self.f["grande"], AMARILLO if es_ganador else ROJO, 
                                     ANCHO // 2, ALTO // 2 - 40)
