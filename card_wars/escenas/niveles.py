@@ -63,9 +63,9 @@ class EscenaNiveles(Escena):
 
         e = ESCALA_PIXEL
 
-        w = Botones.DIFICULTAD_W * e
-        h = Botones.DIFICULTAD_H * e
-        sep = Botones.DIFICULTAD_ESPACIO_Y * e
+        w = Botones.MENU_W * e
+        h = Botones.MENU_H * e
+        sep = Botones.MENU_ESPACIO_Y * e
         margen_x = Botones.MENU_X_MARGEN * e
         margen_y = Botones.MENU_Y_MARGEN * e
 
@@ -74,6 +74,7 @@ class EscenaNiveles(Escena):
 
         self.botones = []
         for i in range(n):
+            # El cálculo es idéntico al del menú
             y_px = y_ultimo - (n - 1 - i) * (h + sep)
             x_px = margen_x
             rect = pygame.Rect(x_px, y_px, w, h)
